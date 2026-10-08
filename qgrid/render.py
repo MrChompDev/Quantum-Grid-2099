@@ -68,6 +68,18 @@ def _center(text: str, width: int) -> str:
     return " " * pad + text
 
 
+def _wrap_center(text: str, width: int, color: str | None = None) -> list[str]:
+    """Word-wrap a lore paragraph to the terminal width, centered per line."""
+    import textwrap
+
+    lines = textwrap.wrap(text, width=max(20, width - 8))
+    out = []
+    for line in lines:
+        rendered = _c(color, line) if color else line
+        out.append(_center(rendered, width))
+    return out
+
+
 # ------------------------------------------------------------------- gameplay
 
 
@@ -114,7 +126,7 @@ def _bandwidth_bar(bandwidth: int) -> str:
 
 
 def _header_lines(game) -> list[str]:
-    node = f"0{game.level_index + 1}"
+    node = f"{game.level_index + 1:02d}"
     title = _c(CYAN, f"  QUANTUM GRID 2099 // MAINFRAME NODE {node}") + _c(
         GRAY, f" - {game.defn.name}"
     )
@@ -154,23 +166,27 @@ def _emit(lines: list[str], width: int, height: int, home: str) -> str:
 
 
 def render_frame(game, width: int = MIN_W, height: int = MIN_H) -> str:
-    """Build the gameplay frame sized to the terminal, grid centered."""
+    """Build the gameplay frame filling the terminal, grid centered."""
     width = max(width, MIN_W)
     height = max(height, MIN_H)
     grid_w = game.layout.width + 2
     indent = max(2, (width - grid_w) // 2)
 
+    # chrome: 4 header lines + 3 footer lines; grid centered in between
+    middle = height - 7
+    grid_h = game.layout.height
+    pad_above = max(0, (middle - grid_h) // 2)
+    pad_below = max(0, middle - grid_h - pad_above)
+
     lines: list[str] = [_rule(width)]
     lines.extend(_header_lines(game))
     lines.append(_rule(width))
-    lines.append("")
+    lines.extend([""] * pad_above)
     for y in range(game.layout.height):
         row = "".join(_cell_str(game, x, y) for x in range(game.layout.width))
         lines.append(" " * indent + row)
-    lines.append("")
-    lines.append(
-        f"  {_c(GRAY, 'STATUS:')} {_c(YELLOW, _truncate(game.msg, width - 14))}"
-    )
+    lines.extend([""] * pad_below)
+    lines.append(f"  {_c(GRAY, 'STATUS:')} {_c(YELLOW, _truncate(game.msg, width - 14))}")
     lines.append(_CONTROLS_LINE)
     lines.append(_rule(width))
     return _emit(lines, width, height, HOME)
@@ -197,6 +213,8 @@ def _colored_banner(text: str, color: str) -> list[str]:
 
 
 def render_title(width: int = MIN_W, height: int = MIN_H) -> str:
+    from .levels import TITLE_LORE
+
     body = [
         "",
         _center(_c(CYAN, "SYSTEM BOOT // NODE ACCESS TERMINAL v2.099"), width),
@@ -204,14 +222,12 @@ def render_title(width: int = MIN_W, height: int = MIN_H) -> str:
         *_indent(_colored_banner("QUANTUM GRID", CYAN)),
         *_indent(_colored_banner("2099", EMITTER_RED)),
         "",
+        *_wrap_center(TITLE_LORE, width),
+        "",
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
-        _center("You have jacked into a corrupted corporate mainframe.", width),
-        _center(
-            "Rotate optical mirrors, redirect laser fire, power the receptors.", width
-        ),
-        "",
+        _center("Rotate optical mirrors, redirect laser fire, power the receptors.", width),
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO JACK IN <<<"), width),
     ]
     return _screen(body, width, height)
@@ -230,10 +246,10 @@ def render_level_select(
     ]
     for i, defn in enumerate(LEVELS):
         if unlock_all or i <= unlocked:
-            label = _c(WHITE, f"[{i + 1}] NODE 0{i + 1}") + _c(CYAN, f" - {defn.name}")
+            label = _c(WHITE, f"[{i + 1}] NODE {i + 1:02d}") + _c(CYAN, f" - {defn.name}")
         else:
             label = (
-                _c(GRAY, f"[{i + 1}] NODE 0{i + 1}")
+                _c(GRAY, f"[{i + 1}] NODE {i + 1:02d}")
                 + _c(GRAY, f" - {defn.name}")
                 + "  "
                 + _c(RED, "[LOCKED]")
@@ -251,17 +267,15 @@ def render_level_select(
 def render_level_intro(
     defn: LevelDef, bandwidth: int, width: int = MIN_W, height: int = MIN_H
 ) -> str:
-    from .levels import LEVELS
-
-    layout = None
-    from .levels import parse_level
+    from .levels import LEVELS, parse_level
 
     layout = parse_level(defn.rows, defn.name)
+    node = LEVELS.index(defn) + 1
     body = [
         "",
         _center(_c(EMITTER_RED, "NEW NODE DETECTED"), width),
         "",
-        _center(_c(CYAN, f"NODE 0{LEVELS.index(defn) + 1} - {defn.name}"), width),
+        _center(_c(CYAN, f"NODE {node:02d} - {defn.name}"), width),
         _center(
             _c(
                 GRAY,
@@ -271,7 +285,9 @@ def render_level_intro(
             width,
         ),
         "",
-        _center(_truncate(defn.intro, width - 6), width),
+        *_wrap_center(defn.lore, width, color=GRAY),
+        "",
+        _center(_c(WHITE, f"OBJECTIVE: {_truncate(defn.intro, width - 16)}"), width),
         "",
         _center(
             f"BANDWIDTH: {_c(BEAM_GREEN, str(bandwidth))}%"
@@ -294,19 +310,15 @@ def render_level_complete(
         _center(_c(BEAM_GREEN, "*** ACCESS GRANTED ***"), width),
         "",
         _center(
-            _c(CYAN, f"NODE 0{game.level_index + 1} - {game.defn.name}")
+            _c(CYAN, f"NODE {game.level_index + 1:02d} - {game.defn.name}")
             + _c(BEAM_GREEN, " // EXTRACTION COMPLETE"),
             width,
         ),
         "",
-        _center(
-            f"Bandwidth bonus: {_c(BEAM_GREEN, '+20%')}"
-            f" {_c(GRAY, '(current: ')}{_c(BEAM_GREEN, str(game.bandwidth))}{_c(GRAY, '%)')}",
-            width,
-        ),
+        _center(_c(BEAM_GREEN, "BANDWIDTH REFRESHED TO 100%"), width),
         "",
         _center(
-            f"Descend to NODE 0{next_index + 1} - {LEVELS[next_index].name}", width
+            f"Descend to NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width
         ),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO CONTINUE <<<"), width),
@@ -315,14 +327,17 @@ def render_level_complete(
 
 
 def render_game_over(game, width: int = MIN_W, height: int = MIN_H) -> str:
+    from .levels import GAMEOVER_LORE
+
     body = [
         "",
         _center(_c(EMITTER_RED, "*** CONNECTION LOST ***"), width),
         "",
         _center(_c(RED, "BANDWIDTH DEPLETED - SESSION TERMINATED"), width),
         "",
-        _center("The mainframe firewall has severed your link.", width),
-        _center(f"You fell on NODE 0{game.level_index + 1} - {game.defn.name}.", width),
+        *_wrap_center(GAMEOVER_LORE, width, color=GRAY),
+        "",
+        _center(f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO DISCONNECT <<<"), width),
     ]
@@ -330,13 +345,16 @@ def render_game_over(game, width: int = MIN_W, height: int = MIN_H) -> str:
 
 
 def render_victory(session, width: int = MIN_W, height: int = MIN_H) -> str:
+    from .levels import VICTORY_LORE
+
     body = [
         "",
         _center(_c(BEAM_GREEN, "*** MAINFRAME COMPROMISED ***"), width),
         "",
         *_indent(_colored_banner("GRID", BEAM_GREEN)),
         "",
-        _center("All six mainframe nodes liberated. The Quantum Grid is yours.", width),
+        *_wrap_center(VICTORY_LORE, width),
+        "",
         _center(f"Total actions burned: {session.total_actions}", width),
         "",
         *_indent([_c(GRAY, row) for row in assets.VICTORY_MOTIF]),

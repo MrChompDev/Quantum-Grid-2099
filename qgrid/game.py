@@ -5,7 +5,6 @@ from .physics import DIR4, trace_beam
 
 BANDWIDTH_MAX = 100
 BANDWIDTH_STEP = 1
-BONUS = 20
 
 DIR_VECTORS: dict[str, tuple[int, int]] = {
     "w": (0, -1),
@@ -132,8 +131,8 @@ class Game:
         self.msg = f"Node reset. Bandwidth restored to {self.snapshot}%."
 
     def finish_level(self) -> int:
-        """Apply the extraction bonus and unlock the next node."""
-        self.bandwidth = min(BANDWIDTH_MAX, self.bandwidth + BONUS)
+        """Refresh bandwidth to full and unlock the next node."""
+        self.bandwidth = BANDWIDTH_MAX
         self.unlocked = max(self.unlocked, self.level_index + 1)
         return self.bandwidth
 

@@ -161,9 +161,19 @@ class Session:
                 return None
             if key in ("\r", "\n", " "):
                 return 0 if self.unlock_all else self.unlocked
-            if key and key.isdigit() and 1 <= int(key) <= len(LEVELS):
-                idx = int(key) - 1
-                if self.unlock_all or idx <= self.unlocked:
+            if key and key.isdigit():
+                num = key
+                # buffer a second digit for two-digit node numbers (10+)
+                try:
+                    nxt = await asyncio.wait_for(self.read_key(), 0.3)
+                except (asyncio.TimeoutError, TimeoutError):
+                    nxt = None
+                if nxt is QUIT:
+                    return None
+                if nxt and nxt.isdigit():
+                    num += nxt
+                idx = int(num) - 1
+                if 0 <= idx < len(LEVELS) and (self.unlock_all or idx <= self.unlocked):
                     return idx
 
     async def _play_level(self, index: int) -> str:
