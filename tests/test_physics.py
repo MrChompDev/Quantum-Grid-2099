@@ -237,14 +237,3 @@ class TestLevelParsing:
             assert layout.player_start != layout.exit_pos
             w, h = layout.width, layout.height
             assert all(0 < x < w - 1 and 0 < y < h - 1 for x, y in layout.receptors)
-
-    def test_grid_sizes_grow_across_campaign(self):
-        sizes = [
-            (parse_level(d.rows, d.name).width, parse_level(d.rows, d.name).height)
-            for d in LEVELS
-        ]
-        widths = [w for w, _ in sizes]
-        assert widths == sorted(widths)
-        assert len(LEVELS) == 6
-        assert sizes[0] == (24, 11)
-        assert sizes[-1] == (56, 14)

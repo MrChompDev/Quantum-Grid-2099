@@ -6,23 +6,37 @@ Run:  python3 scripts/smoke_test.py
 """
 
 import asyncio
+import os
 import re
 import select
 import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncssh
+
+from qgrid.level_data import LEVEL_DATA
+from qgrid.levels import parse_level
+from qgrid.solver import solve_level
 
 PORT = 2299
 HOST = "127.0.0.1"
 KEY = "/tmp/opencode/qgrid_smoke_key"
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[=>]")
+KEY_FOR_DIR = {"w": "w", "a": "a", "s": "s", "d": "d"}
 
 
 def strip_ansi(s: str) -> str:
     return ANSI_RE.sub("", s)
+
+
+def level1_keys() -> str:
+    """BFS-optimal key sequence for Node 01 from the shared level data."""
+    path = solve_level(parse_level(LEVEL_DATA[0]["rows"], "l1"))
+    return "".join(KEY_FOR_DIR[(dx, dy)] if act == "m" else "r" for act, dx, dy in path)
 
 
 class Client:
@@ -107,7 +121,7 @@ async def main() -> int:
 
             # -- level select
             c.send(" ")
-            out = await c.read_until("SELECT NODE")
+            out = await c.read_until("MAINFRAME NODE ACCESS")
             assert "NODE 01" in out
             assert "[LOCKED]" in out  # node 2+ still locked
             print("PASS level select (locked nodes shown)")
@@ -123,21 +137,22 @@ async def main() -> int:
             assert "STATUS:" in out
             print("PASS gameplay frame")
 
-            # -- rotate the mirror -> all receptors online
-            c.send("r")
+            # -- rotate the mirror -> all receptors online, then walk to E
+            keys = level1_keys()
+            r_idx = keys.index("r")
+            c.send(keys[: r_idx + 1])
             out = await c.read_until("ALL RECEPTORS ONLINE", "UNLOCKED")
             assert "RECEPTORS: 1/1" in out
-            print("PASS mirror rotation -> receptor powered, exit unlocked")
+            print("PASS solver keys -> receptor powered, exit unlocked")
 
-            # -- walk to the extraction node: (17,3) -> (12,3) -> (12,8)
-            c.send("aaaaa" + "sssss")
+            c.send(keys[r_idx + 1 :])
             await c.read_until("ACCESS GRANTED")
             print("PASS extraction -> level complete screen")
 
             # -- back to node select, node 02 unlocked now
             c.send(" ")
-            out = await c.read_until("SELECT NODE")
-            assert "[2] NODE 02 - THE CORNERING" in out
+            out = await c.read_until("MAINFRAME NODE ACCESS")
+            assert "[2] NODE 02 - COLD BOOT" in out
             assert "[LOCKED]" in out  # node 03+ still locked
             print("PASS progression unlock (node 02 available)")
 

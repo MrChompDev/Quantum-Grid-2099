@@ -1,140 +1,40 @@
-"""Level solvability verification via BFS over (player, mirrors) states.
+"""Level solvability verification via BFS.
 
-Ground truth for the 5 handcrafted nodes: every level must be solvable,
-and the optimal solution must fit the node's bandwidth budget.
+Levels are procedurally generated (constructive: the beam path is built
+first, so a solution exists by construction) and re-verified here with
+the BFS solver as the independent safety net.
 """
 
-from collections import deque
-
-from qgrid.game import BANDWIDTH_MAX, start_bandwidth
-from qgrid.levels import EMITTER_CHARS, LEVELS, WALL, parse_level
-from qgrid.physics import DIR4, trace_beam
-
-
-def passable(layout, pos):
-    x, y = pos
-    if not (0 <= x < layout.width and 0 <= y < layout.height):
-        return False
-    terrain = layout.rows[y][x]
-    return terrain not in (WALL,) and terrain not in EMITTER_CHARS
-
-
-def solve(defn):
-    """BFS for the shortest action sequence that powers all receptors and
-    steps onto the extraction node. Returns the action path or None."""
-    layout = parse_level(defn.rows, defn.name)
-    receptors = set(layout.receptors)
-    start = (layout.player_start, frozenset(layout.mirrors.items()))
-    queue = deque([(start, ())])
-    visited = {start}
-    while queue:
-        (player, mirrors_fs), path = queue.popleft()
-        mirrors = dict(mirrors_fs)
-        trace = trace_beam(layout, player, mirrors)
-        if player == layout.exit_pos and trace.powered == receptors:
-            return path
-        # moves
-        for dx, dy in DIR4:
-            nxt = (player[0] + dx, player[1] + dy)
-            if not passable(layout, nxt):
-                continue
-            state = (nxt, mirrors_fs)
-            if state not in visited:
-                visited.add(state)
-                queue.append((state, path + ("m",)))
-        # rotate adjacent (or underfoot) mirror
-        target = None
-        if player in mirrors:
-            target = player
-        else:
-            for dx, dy in DIR4:
-                cand = (player[0] + dx, player[1] + dy)
-                if cand in mirrors:
-                    target = cand
-                    break
-        if target is not None:
-            new_mirrors = dict(mirrors_fs)
-            new_mirrors[target] = "/" if new_mirrors[target] == "\\" else "\\"
-            state = (player, frozenset(new_mirrors.items()))
-            if state not in visited:
-                visited.add(state)
-                queue.append((state, path + ("r",)))
-    return None
+from qgrid.levels import LEVELS, parse_level
+from qgrid.solver import optimal_actions
 
 
 class TestAllLevelsSolvable:
-    def test_every_level_solvable(self):
+    def test_every_level_solvable_and_feasible(self):
         optimals = {}
         for defn in LEVELS:
-            path = solve(defn)
-            assert path is not None, f"{defn.name} is unsolvable"
-            optimals[defn.name] = len(path)
+            opt = optimal_actions(defn)
+            assert opt is not None, f"{defn.name} is unsolvable"
+            optimals[defn.name] = opt
         print("\noptimal action counts:", optimals)
-        assert optimals["FIRST LIGHT"] <= 20
-        assert optimals["THE CORNERING"] <= 90
-        assert optimals["SPLIT FOCUS"] <= 90
-        assert optimals["BANDWIDTH CRUNCH"] <= 46
-        assert optimals["CORE MAINFRAME"] <= 80
-        assert optimals["SINGULARITY"] <= 72
+        for name, opt in optimals.items():
+            assert opt <= 92, f"{name}: optimal {opt} exceeds a 100% budget"
 
-    def test_optimal_solutions_fit_entry_bandwidth(self):
-        """Entering bandwidth chain check with perfect play."""
-        carry = 100
-        for defn in LEVELS:
-            entry = start_bandwidth(defn, carry)
-            optimal = len(solve(defn))
-            assert optimal <= entry, (
-                f"{defn.name}: optimal {optimal} > entry bandwidth {entry}"
-            )
-            carry = min(BANDWIDTH_MAX, entry - optimal + 20)
+    def test_sixteen_levels_with_lore(self):
+        assert len(LEVELS) == 16
+        names = [d.name for d in LEVELS]
+        assert len(set(names)) == 16, "duplicate node names"
+        for d in LEVELS:
+            assert d.lore, f"{d.name} has no lore"
+            assert d.intro, f"{d.name} has no objective"
+            assert d.bandwidth_start == 100  # bandwidth refreshes every level
 
-
-class TestIntendedSolutions:
-    """Verify the hand-designed mirror configurations power all receptors."""
-
-    def solved(self, defn, mirror_states):
-        layout = parse_level(defn.rows, defn.name)
-        trace = trace_beam(layout, layout.player_start, mirror_states)
-        return trace.powered == set(layout.receptors)
-
-    def test_first_light(self):
-        assert self.solved(LEVELS[0], {(16, 3): "\\"})
-
-    def test_the_cornering(self):
-        assert self.solved(LEVELS[1], {(8, 2): "\\", (8, 9): "\\", (20, 9): "/"})
-
-    def test_split_focus(self):
-        assert self.solved(
-            LEVELS[2],
-            {(8, 1): "\\", (8, 8): "\\", (14, 8): "/", (14, 1): "/", (22, 1): "\\"},
-        )
-
-    def test_bandwidth_crunch(self):
-        assert self.solved(
-            LEVELS[3], {(6, 2): "\\", (6, 11): "\\", (14, 11): "/", (14, 1): "\\"}
-        )
-
-    def test_core_mainframe(self):
-        assert self.solved(
-            LEVELS[4],
-            {
-                (10, 2): "\\",
-                (10, 10): "\\",
-                (18, 10): "/",
-                (38, 2): "/",
-                (38, 12): "/",
-                (30, 12): "\\",
-            },
-        )
-
-    def test_singularity(self):
-        assert self.solved(
-            LEVELS[5],
-            {
-                (10, 2): "\\",
-                (10, 10): "\\",
-                (20, 10): "/",
-                (36, 12): "\\",
-                (36, 4): "/",
-            },
-        )
+    def test_grid_sizes_grow_across_campaign(self):
+        widths = [parse_level(d.rows, d.name).width for d in LEVELS]
+        heights = [parse_level(d.rows, d.name).height for d in LEVELS]
+        assert widths == sorted(widths), "grid width does not grow with level"
+        assert widths[0] == 24 and widths[-1] == 69
+        assert heights[0] == 11 and heights[-1] == 14
+        # every grid fits an 80x24 terminal with chrome (7 lines)
+        for w, h in zip(widths, heights):
+            assert w + 4 <= 80 and h + 7 <= 24

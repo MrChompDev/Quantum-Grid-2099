@@ -19,9 +19,9 @@ from random import Random
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from qgrid.levels import EMITTER_CHARS, parse_level  # noqa: E402
-from qgrid.physics import DIR_VEC, REFLECT, trace_beam  # noqa: E402
-from qgrid.solver import solve_level  # noqa: E402
+from qgrid.levels import parse_level
+from qgrid.physics import DIR_VEC, REFLECT, trace_beam
+from qgrid.solver import solve_level
 
 SEED = 2099
 N_LEVELS = 16
@@ -94,10 +94,17 @@ def _turn_glyph(incoming: tuple[int, int], outgoing: tuple[int, int]) -> str | N
     return None
 
 
-def _construct(rng: Random, w: int, h: int, n_emitters: int, n_mirrors: int,
-               n_receptors: int, n_walls: int):
+def _construct(
+    rng: Random,
+    w: int,
+    h: int,
+    n_emitters: int,
+    n_mirrors: int,
+    n_receptors: int,
+    n_walls: int,
+):
     """Build one candidate level. Returns (rows, ...) or None on conflict."""
-    mirrors: dict[tuple[int, int], str] = {}   # solution state
+    mirrors: dict[tuple[int, int], str] = {}  # solution state
     emitter_cells: set[tuple[int, int]] = set()
     emitters: list[tuple[tuple[int, int], str]] = []
     paths: list[set[tuple[int, int]]] = []
@@ -186,7 +193,9 @@ def _construct(rng: Random, w: int, h: int, n_emitters: int, n_mirrors: int,
     player, exit_pos = rng.sample(free_cells, 2)
 
     # flip a difficulty-scaled subset of mirrors for the initial state
-    flip_count = min(len(mirrors), max(1, len(mirrors) // 2 + (1 if len(mirrors) > 3 else 0)))
+    flip_count = min(
+        len(mirrors), max(1, len(mirrors) // 2 + (1 if len(mirrors) > 3 else 0))
+    )
     initial = dict(mirrors)
     for pos in rng.sample(sorted(mirrors), flip_count):
         initial[pos] = "/" if initial[pos] == "\\" else "\\"
@@ -246,7 +255,11 @@ def generate_level(index: int, rng: Random) -> dict:
             "intro": (
                 f"Node {index:02d} of the OMNICORP Quantum Grid. "
                 f"{len(layout.mirrors)} mirrors, {len(layout.receptors)} receptors"
-                + (f", {len(layout.emitters)} emitters" if len(layout.emitters) > 1 else "")
+                + (
+                    f", {len(layout.emitters)} emitters"
+                    if len(layout.emitters) > 1
+                    else ""
+                )
                 + ". Power all receptors, reach the extraction node."
             ),
             "rows": rows,
@@ -273,8 +286,11 @@ def main() -> int:
             flush=True,
         )
 
-    out_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            "qgrid", "level_data.py")
+    out_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "qgrid",
+        "level_data.py",
+    )
     with open(out_path, "w") as f:
         f.write('"""Generated level data for Quantum Grid 2099.\n\n')
         f.write(f"Procedurally generated (seed {SEED}) and BFS-verified by\n")
@@ -291,8 +307,7 @@ def main() -> int:
             f.write(f'        "lore": {data["lore"]!r},\n')
             f.write(f'        "intro": {data["intro"]!r},\n')
             f.write('        "rows": (\n')
-            for row in data["rows"]:
-                f.write(f'            {row!r},\n')
+            f.writelines(f"            {row!r},\n" for row in data["rows"])
             f.write("        ),\n")
             f.write(f'        "bandwidth_start": {data["bandwidth_start"]},\n')
             f.write(f'        "bandwidth_floor": {data["bandwidth_floor"]},\n')

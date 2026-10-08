@@ -31,9 +31,21 @@ EXIT = "E"
 EMITTER_CHARS = (">", "<", "^", "v")
 
 __all__ = [
-    "WALL", "FLOOR", "PLAYER", "RECEPTOR", "MIRROR_A", "MIRROR_B", "EXIT",
-    "EMITTER_CHARS", "LevelDef", "LevelLayout", "parse_level", "LEVELS",
-    "TITLE_LORE", "GAMEOVER_LORE", "VICTORY_LORE",
+    "EMITTER_CHARS",
+    "EXIT",
+    "FLOOR",
+    "GAMEOVER_LORE",
+    "LEVELS",
+    "MIRROR_A",
+    "MIRROR_B",
+    "PLAYER",
+    "RECEPTOR",
+    "TITLE_LORE",
+    "VICTORY_LORE",
+    "WALL",
+    "LevelDef",
+    "LevelLayout",
+    "parse_level",
 ]
 
 

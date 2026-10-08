@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full-campaign playthrough: connects over SSH and beats all 5 nodes using
+"""Full-campaign playthrough: connects over SSH and beats all 16 nodes using
 BFS-computed optimal solutions, then verifies the victory screen.
 
 Run:  python3 scripts/full_playthrough.py
@@ -12,15 +12,14 @@ import select
 import subprocess
 import sys
 import time
-from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncssh
 
 from qgrid.game import DIR_VECTORS
-from qgrid.levels import EMITTER_CHARS, LEVELS, WALL, parse_level
-from qgrid.physics import DIR4, trace_beam
+from qgrid.levels import LEVELS, parse_level
+from qgrid.solver import solve_level
 
 PORT = 2299
 HOST = "127.0.0.1"
@@ -35,52 +34,10 @@ def strip_ansi(s: str) -> str:
 
 
 def solve_keys(defn) -> list[str]:
-    """BFS over (player, mirrors); returns the optimal SSH key sequence."""
-    layout = parse_level(defn.rows, defn.name)
-    receptors = set(layout.receptors)
-
-    def passable(pos):
-        x, y = pos
-        if not (0 <= x < layout.width and 0 <= y < layout.height):
-            return False
-        return (
-            layout.rows[y][x] not in (WALL,) and layout.rows[y][x] not in EMITTER_CHARS
-        )
-
-    start = (layout.player_start, frozenset(layout.mirrors.items()))
-    queue = deque([(start, ())])
-    visited = {start}
-    while queue:
-        (player, mfs), path = queue.popleft()
-        mirrors = dict(mfs)
-        trace = trace_beam(layout, player, mirrors)
-        if player == layout.exit_pos and trace.powered == receptors:
-            return [
-                KEY_FOR_DIR[(dx, dy)] if act == "m" else "r" for act, dx, dy in path
-            ]
-        for dx, dy in DIR4:
-            nxt = (player[0] + dx, player[1] + dy)
-            if not passable(nxt):
-                continue
-            state = (nxt, mfs)
-            if state not in visited:
-                visited.add(state)
-                queue.append((state, path + (("m", dx, dy),)))
-        target = player if player in mirrors else None
-        if target is None:
-            for dx, dy in DIR4:
-                cand = (player[0] + dx, player[1] + dy)
-                if cand in mirrors:
-                    target = cand
-                    break
-        if target is not None:
-            new_mirrors = dict(mfs)
-            new_mirrors[target] = "/" if new_mirrors[target] == "\\" else "\\"
-            state = (player, frozenset(new_mirrors.items()))
-            if state not in visited:
-                visited.add(state)
-                queue.append((state, path + (("r", 0, 0),)))
-    raise AssertionError(f"{defn.name} unsolvable")
+    """BFS-optimal SSH key sequence for a level definition."""
+    path = solve_level(parse_level(defn.rows, defn.name))
+    assert path is not None, f"{defn.name} unsolvable"
+    return [KEY_FOR_DIR[(dx, dy)] if act == "m" else "r" for act, dx, dy in path]
 
 
 class Client:

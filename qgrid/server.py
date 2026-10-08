@@ -74,6 +74,9 @@ class Session:
     # ------------------------------------------------------------------ input
 
     async def read_key(self) -> str | None:
+        import os as _os
+        if _os.environ.get("QG_DEBUG"):
+            print(f"[DBG] read_key enter", flush=True)
         """Read one keypress.
 
         Returns QUIT on EOF / Ctrl-C / 'q', or a normalized key character:
@@ -87,6 +90,8 @@ class Session:
                     return QUIT
                 continue
             if not data:
+                if _os.environ.get("QG_DEBUG"):
+                    print("[DBG] read_key EOF -> QUIT", flush=True)
                 return QUIT
             if isinstance(data, bytes):
                 data = data.decode("utf-8", "replace")
@@ -96,6 +101,8 @@ class Session:
                 if ch == NOOP:
                     continue
             if ch in ("q", "Q"):
+                if _os.environ.get("QG_DEBUG"):
+                    print(f"[DBG] read_key {ch!r} -> QUIT", flush=True)
                 return QUIT
             if ch in DIR_VECTORS:
                 return ch

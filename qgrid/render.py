@@ -186,7 +186,9 @@ def render_frame(game, width: int = MIN_W, height: int = MIN_H) -> str:
         row = "".join(_cell_str(game, x, y) for x in range(game.layout.width))
         lines.append(" " * indent + row)
     lines.extend([""] * pad_below)
-    lines.append(f"  {_c(GRAY, 'STATUS:')} {_c(YELLOW, _truncate(game.msg, width - 14))}")
+    lines.append(
+        f"  {_c(GRAY, 'STATUS:')} {_c(YELLOW, _truncate(game.msg, width - 14))}"
+    )
     lines.append(_CONTROLS_LINE)
     lines.append(_rule(width))
     return _emit(lines, width, height, HOME)
@@ -215,10 +217,8 @@ def _colored_banner(text: str, color: str) -> list[str]:
 def render_title(width: int = MIN_W, height: int = MIN_H) -> str:
     from .levels import TITLE_LORE
 
+    # fits exactly 24 rows on a standard terminal
     body = [
-        "",
-        _center(_c(CYAN, "SYSTEM BOOT // NODE ACCESS TERMINAL v2.099"), width),
-        "",
         *_indent(_colored_banner("QUANTUM GRID", CYAN)),
         *_indent(_colored_banner("2099", EMITTER_RED)),
         "",
@@ -227,10 +227,24 @@ def render_title(width: int = MIN_W, height: int = MIN_H) -> str:
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
-        _center("Rotate optical mirrors, redirect laser fire, power the receptors.", width),
+        _center(
+            "Rotate optical mirrors, redirect laser fire, power the receptors.", width
+        ),
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO JACK IN <<<"), width),
     ]
     return _screen(body, width, height)
+
+
+def _node_label(i: int, unlocked: int, unlock_all: bool) -> str:
+    from .levels import LEVELS
+
+    if unlock_all or i <= unlocked:
+        return _c(WHITE, f"[{i + 1}] NODE {i + 1:02d}") + _c(
+            CYAN, f" - {LEVELS[i].name}"
+        )
+    return _c(GRAY, f"[{i + 1}] NODE {i + 1:02d} - {LEVELS[i].name}") + _c(
+        RED, " [LOCKED]"
+    )
 
 
 def render_level_select(
@@ -241,24 +255,19 @@ def render_level_select(
     body = [
         _center(_c(CYAN, "MAINFRAME NODE ACCESS"), width),
         "",
-        "  SELECT NODE:",
-        "",
     ]
-    for i, defn in enumerate(LEVELS):
-        if unlock_all or i <= unlocked:
-            label = _c(WHITE, f"[{i + 1}] NODE {i + 1:02d}") + _c(CYAN, f" - {defn.name}")
-        else:
-            label = (
-                _c(GRAY, f"[{i + 1}] NODE {i + 1:02d}")
-                + _c(GRAY, f" - {defn.name}")
-                + "  "
-                + _c(RED, "[LOCKED]")
-            )
-        body.append("  " + label)
+    half = (len(LEVELS) + 1) // 2
+    for i in range(half):
+        left = _node_label(i, unlocked, unlock_all)
+        right = ""
+        if i + half < len(LEVELS):
+            right = _node_label(i + half, unlocked, unlock_all)
+        pad = 36 - len(_strip_ansi(left))
+        body.append("  " + left + " " * max(1, pad) + right)
     body.extend(
         [
             "",
-            f"  Press 1-{len(LEVELS)} to jack in | ENTER for next available node | Q to disconnect",
+            f"  Press 1-{len(LEVELS)} to jack in | ENTER for next node | Q to disconnect",
         ]
     )
     return _screen(body, width, height)
@@ -337,7 +346,9 @@ def render_game_over(game, width: int = MIN_W, height: int = MIN_H) -> str:
         "",
         *_wrap_center(GAMEOVER_LORE, width, color=GRAY),
         "",
-        _center(f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width),
+        _center(
+            f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width
+        ),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO DISCONNECT <<<"), width),
     ]
