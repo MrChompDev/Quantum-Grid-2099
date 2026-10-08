@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncssh
 
+from qgrid.game import DIR_VECTORS
 from qgrid.level_data import LEVEL_DATA
 from qgrid.levels import parse_level
 from qgrid.solver import solve_level
@@ -26,7 +27,7 @@ HOST = "127.0.0.1"
 KEY = "/tmp/opencode/qgrid_smoke_key"
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[=>]")
-KEY_FOR_DIR = {"w": "w", "a": "a", "s": "s", "d": "d"}
+KEY_FOR_DIR = {v: k for k, v in DIR_VECTORS.items()}
 
 
 def strip_ansi(s: str) -> str:
@@ -167,7 +168,7 @@ async def main() -> int:
                 c2 = Client(s2_in, s2_out)
                 await c2.read_until("JACK IN")
                 c2.send(" ")
-                await c2.read_until("SELECT NODE")
+                await c2.read_until("MAINFRAME NODE ACCESS")
                 c2.send("1")
                 await c2.read_until("FIRST LIGHT")
                 return "second-ok"

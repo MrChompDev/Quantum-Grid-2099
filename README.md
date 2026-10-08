@@ -1,26 +1,27 @@
 # QUANTUM GRID 2099
 
 A cyberpunk laser-reflection puzzle game played entirely over SSH. You jack into
-a corrupted corporate mainframe, operate a light-beam probe (`@`), rotate
+OMNICORP's corrupted Quantum Grid, operate a light-beam probe (`@`), rotate
 optical mirrors (`/` `\`) and redirect laser fire from emitters into receptors.
 Power all receptors to unlock the extraction node — and watch your bandwidth.
 
-Six handcrafted nodes across growing grids (24x11 up to 56x14), rendered in a
-cyber-blue ANSI theme: blue probe on black, green laser fire, red emitters.
+**16 lore-driven nodes** across growing grids (24x11 up to 69x14), rendered in a
+cyber-blue ANSI theme that fills your whole terminal: blue probe on black,
+green laser fire, red emitters.
 
 ```
 ================================================================================
   QUANTUM GRID 2099 // MAINFRAME NODE 01 - FIRST LIGHT
-  BANDWIDTH: [█████████████████░░░] 85% | RECEPTORS: 0/1 [LOCKED]
+  BANDWIDTH: [████████████████████] 100% | RECEPTORS: 0/1 [LOCKED]
 ================================================================================
 
-                           ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-                           ▓······················▓
-                           ▓·▶────────────@\······▓
-                           ▓······················▓
-                           ▓···········Ω···◉······▓
-                           ▓······················▓
-                           ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                 ▓·····························▓
+                 ▓·▶────────────@\·············▓
+                 ▓·····························▓
+                 ▓············Ω···◉············▓
+                 ▓·····························▓
+                 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
   STATUS: Probe repositioned. Target node unpowered. Re-route beam line.
   CONTROLS: WASD (Move) | R (Rotate Mirror) | K (Restart) | Q (Disconnect)
@@ -51,7 +52,7 @@ No authentication is required — anyone who connects gets a session.
 
 | Variable | Description |
 | --- | --- |
-| `QG_UNLOCK_ALL=1` | Unlock all six nodes from the start (demo/judging mode) |
+| `QG_UNLOCK_ALL=1` | Unlock all sixteen nodes from the start (demo/judging mode) |
 
 ## Controls
 
@@ -61,6 +62,7 @@ No authentication is required — anyone who connects gets a session.
 | `R` | Rotate an adjacent (or underfoot) mirror |
 | `K` | Restart the current node (restores entry bandwidth) |
 | `Q` | Disconnect |
+| `1`-`16` / `ENTER` | Select a node (two-digit numbers buffered) |
 
 ## Mechanics
 
@@ -86,33 +88,54 @@ Every action re-runs the ray tracer from each emitter. Mirrors bend the beam
 - `\`: right→down, left→up, up→left, down→right
 
 Receptors are powered by the beam and let it pass through. The player probe
-absorbs any beam it stands in — including the beam feeding a receptor you are
-standing on top of the trail of. Beams stop at walls, at the grid border, or if
-they re-enter the same cell in the same direction (loop protection).
+absorbs any beam it stands in — including the beam feeding a receptor further
+down the trail. Beams stop at walls, at the grid border, or if they re-enter
+the same cell in the same direction (loop protection).
 
 ### Bandwidth
 
 Every successful move or rotation consumes **1%**. Hitting **0%** severs the
-session (game over). Completing a node carries over the remaining bandwidth
-plus a **+20% reload bonus**. Node 04 boots with a hard **46%** budget; Nodes
-05 and 06 boot with auxiliary power reserves (minimum **80%** / **72%**). `K`
-restores the bandwidth you entered the node with — so spend it wisely, but
-don't be afraid to reset.
+session (game over). **Bandwidth refreshes to 100% after every level** — each
+node boots with a full charge. `K` restores the bandwidth you entered the node
+with, so resets are always free.
 
-### Adaptive rendering
+### Full-terminal rendering
 
-Frames are drawn to the client's actual terminal size (minimum 80x24), with
-the grid centered. A bigger terminal window shows the full map; the standard
-80x24 terminal fits every node in the campaign.
+Frames are drawn to the client's actual terminal size (minimum 80x24) and
+fill the whole window: full-width rules, the grid vertically centered between
+the header and the status bar. Terminal size is re-read every frame, so
+resizing mid-game re-flows instantly.
 
-## The Six Nodes
+## Lore
 
-1. **FIRST LIGHT** (24x11) — tutorial: rotate one mirror to complete the direct line.
-2. **THE CORNERING** (30x12) — route the beam around a central wall with three mirrors.
-3. **SPLIT FOCUS** (36x12) — chain the beam through three receptors with five mirrors.
-4. **BANDWIDTH CRUNCH** (40x13) — five-chamber maze, 46-step budget, no backtracking.
-5. **CORE MAINFRAME** (48x14) — two emitters, three receptors, six mirrors, no beam crossings.
-6. **SINGULARITY** (56x14) — two sealed circuits divided by a great wall; the grid's core.
+2099. OMNICORP's Quantum Grid owns the city — power, traffic, data, everything.
+You are a netrunner with a light-beam probe and a debt to settle. Every node
+has its own story beat, shown when you jack in: from the tutorial hatch of
+**FIRST LIGHT** through the firewall gauntlets of **OVERCLOCK** and **DEEP
+GRID**, down to the grid's heart in **SINGULARITY**.
+
+## The Sixteen Nodes
+
+| # | Node | Grid | Mirrors | Receptors | Optimal |
+| --- | --- | --- | --- | --- | --- |
+| 01 | FIRST LIGHT | 24x11 | 1 | 1 | 14 |
+| 02 | COLD BOOT | 27x11 | 1 | 1 | 30 |
+| 03 | THE CORNERING | 30x11 | 2 | 1 | 28 |
+| 04 | DEAD SECTOR | 33x11 | 2 | 1 | 18 |
+| 05 | SPLIT FOCUS | 36x11 | 3 | 2 | 33 |
+| 06 | GHOST PROTOCOL | 39x12 | 3 | 2 | 48 |
+| 07 | NEON MAZE | 42x12 | 4 | 2 | 34 |
+| 08 | BLACKOUT | 45x12 | 4 | 2 | 44 |
+| 09 | FIREWALL | 48x12 | 5 | 3 | 45 |
+| 10 | OVERCLOCK | 51x12 | 5 | 3 | 57 |
+| 11 | DARK FIBER | 54x13 | 6 | 3 | 65 |
+| 12 | ZERO DAY | 57x13 | 6 | 3 | 39 |
+| 13 | TERMINAL VELOCITY | 60x13 | 7 | 4 | 88 |
+| 14 | DEEP GRID | 63x13 | 8 | 4 | 86 |
+| 15 | CORE MAINFRAME | 66x13 | 9 | 4 | 62 |
+| 16 | SINGULARITY | 69x14 | 8 | 4 | 79 |
+
+(Optimal = BFS-verified shortest action count.)
 
 ## Architecture
 
@@ -120,35 +143,43 @@ the grid centered. A bigger terminal window shows the full map; the standard
 main.py            entry point (asyncio + signal handling)
 qgrid/
   assets.py        unicode glyph theme, block-letter banner font, art motifs
-  levels.py        level definitions, ASCII grid parser + border validation
+  level_data.py    GENERATED: 16 BFS-verified levels + lore (do not hand-edit)
+  levels.py        LevelDef/layout model, ASCII grid parser + border validation
   physics.py       ray-tracing engine (emitters, mirrors, receptors, loops)
+  solver.py        BFS solver over (player, mirror-state) space
   game.py          game state, movement, bandwidth, win/lose logic
-  render.py        adaptive ANSI frame builder + all screens (cyber-blue theme)
+  render.py        adaptive full-terminal ANSI frames + all screens
   server.py        asyncssh server, session state machine, raw input handling
-tests/             pytest unit tests + BFS level-solvability verification
+tests/             unit + solver-driven playthrough + level verification tests
 scripts/
-  smoke_test.py    end-to-end test: boots the server, plays Node 01 over SSH
-  full_playthrough.py  beats all 6 nodes over SSH via BFS-optimal solutions
+  generate_levels.py   procedural level generator (constructive + BFS-verified)
+  smoke_test.py        end-to-end test: boots the server, plays Node 01 over SSH
+  full_playthrough.py  beats all 16 nodes over SSH via BFS-optimal solutions
 ```
 
 - **Concurrency:** one independent asyncio session per SSH connection.
 - **Rendering:** cursor-home frame redraws (`\033[H` + `\033[K` per row); full
-  clears only on screen transitions. Terminal size re-read per frame, so
-  resizing mid-game works.
+  clears only on screen transitions.
 - **Input:** 1-byte non-blocking reads; ANSI escape sequences (arrow keys)
   are consumed and mapped to WASD. The server disables its line editor/echo
   (`line_editor=False, line_echo=False`) so keystrokes arrive raw.
-- **Solvability:** every level is verified solvable by a BFS solver over
-  (player, mirror-state) space, and the optimal solution must fit the node's
-  bandwidth budget. Levels were authored with a placement-spec builder to
-  guarantee exact grid geometry.
+- **Level generation (constructive):** a random beam path is built first —
+  emitters, turn-point mirrors, receptors on the path — which guarantees
+  solvability by construction. Walls, probe and extraction node are placed
+  off-path; a difficulty-scaled subset of mirrors starts flipped. Every
+  candidate is re-verified with the BFS solver (solvable, optimal within the
+  tier's difficulty band, not already solved) before being accepted.
+- **Solver performance:** the BFS only evaluates the beam trace for states
+  where the player stands on the extraction node, keeping full-campaign
+  verification under five seconds.
 
 ## Testing
 
 ```bash
-python -m pytest tests/ -q        # unit/level/render tests
+python -m pytest tests/ -q        # unit + solver + level tests
 python scripts/smoke_test.py      # end-to-end over real SSH (port 2299)
-python scripts/full_playthrough.py  # full 6-node campaign over real SSH
+python scripts/full_playthrough.py  # full 16-node campaign over real SSH
+python scripts/generate_levels.py   # regenerate level data (seed 2099)
 ```
 
 ## Deployment (VPS)

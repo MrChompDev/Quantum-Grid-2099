@@ -113,7 +113,7 @@ async def main() -> int:
 
             await c.read_until("JACK IN")
             c.send(" ")
-            await c.read_until("SELECT NODE")
+            await c.read_until("MAINFRAME NODE ACCESS")
             print("connected; starting campaign...", flush=True)
 
             for i, defn in enumerate(LEVELS):
@@ -138,7 +138,7 @@ async def main() -> int:
                         flush=True,
                     )
                     c.send(" ")  # dismiss complete screen -> node select
-                    await c.read_until("SELECT NODE")
+                    await c.read_until("MAINFRAME NODE ACCESS")
 
             c.send("q")
             await c.read_until("CONNECTION TERMINATED", timeout=5)

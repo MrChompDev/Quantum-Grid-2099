@@ -33,6 +33,7 @@ ARROW_MAP = {"A": "w", "B": "s", "C": "d", "D": "a"}
 
 QUIT = None  # EOF, Ctrl-C or 'q'
 NOOP = ""  # ignored input
+_TIMEOUT = object()  # digit-buffer window expired (distinct from QUIT)
 
 
 class QuantumGridServer(asyncssh.SSHServer):
@@ -63,8 +64,9 @@ class Session:
     def _frame_size(self) -> tuple[int, int]:
         """Terminal size, clamped to at least 80x24 (re-read per frame)."""
         try:
-            w, h = self.stdout.channel.get_terminal_size()
-            return max(MIN_W, w), max(MIN_H, h)
+            size = self.stdout.channel.get_terminal_size()
+            # (width, height, pixel_width, pixel_height)
+            return max(MIN_W, size[0]), max(MIN_H, size[1])
         except Exception:  # noqa: BLE001 - fall back to the default
             return MIN_W, MIN_H
 
@@ -74,9 +76,6 @@ class Session:
     # ------------------------------------------------------------------ input
 
     async def read_key(self) -> str | None:
-        import os as _os
-        if _os.environ.get("QG_DEBUG"):
-            print(f"[DBG] read_key enter", flush=True)
         """Read one keypress.
 
         Returns QUIT on EOF / Ctrl-C / 'q', or a normalized key character:
@@ -90,8 +89,6 @@ class Session:
                     return QUIT
                 continue
             if not data:
-                if _os.environ.get("QG_DEBUG"):
-                    print("[DBG] read_key EOF -> QUIT", flush=True)
                 return QUIT
             if isinstance(data, bytes):
                 data = data.decode("utf-8", "replace")
@@ -101,8 +98,6 @@ class Session:
                 if ch == NOOP:
                     continue
             if ch in ("q", "Q"):
-                if _os.environ.get("QG_DEBUG"):
-                    print(f"[DBG] read_key {ch!r} -> QUIT", flush=True)
                 return QUIT
             if ch in DIR_VECTORS:
                 return ch
@@ -174,10 +169,10 @@ class Session:
                 try:
                     nxt = await asyncio.wait_for(self.read_key(), 0.3)
                 except (asyncio.TimeoutError, TimeoutError):
-                    nxt = None
+                    nxt = _TIMEOUT
                 if nxt is QUIT:
                     return None
-                if nxt and nxt.isdigit():
+                if nxt is not _TIMEOUT and nxt and nxt.isdigit():
                     num += nxt
                 idx = int(num) - 1
                 if 0 <= idx < len(LEVELS) and (self.unlock_all or idx <= self.unlocked):
