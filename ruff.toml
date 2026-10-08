@@ -1,0 +1,8 @@
+# Ruff configuration for Quantum Grid 2099
+# EXE002: the project may live on a filesystem that marks all files
+#         executable (exFAT/NTFS removable media) - noise.
+# ASYNC220/ASYNC221: test scripts intentionally spawn the game server
+#         subprocess from async code.
+
+[lint]
+ignore = ["EXE002", "ASYNC220", "ASYNC221"]
