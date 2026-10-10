@@ -435,3 +435,259 @@ CODEX_ON_NODE = {
     39: "kai",       # the ledger line (sector 5, node 7)
 }
 CODEX_ON_SHARDS = {10: "shards"}
+
+
+# ------------------------------------------------------------- settings
+
+SETTINGS_SCHEMA: dict[str, tuple[str, ...]] = {
+    "sound": ("full", "music", "sfx", "off"),
+    "shake": ("on", "off"),
+    "flashes": ("on", "off"),
+    "shimmer": ("on", "off"),
+    "text_speed": ("normal", "fast", "instant"),
+}
+
+DEFAULT_SETTINGS: dict[str, str] = {k: v[0] for k, v in SETTINGS_SCHEMA.items()}
+
+SETTING_LABELS = {
+    "sound": "SOUND",
+    "shake": "SCREEN SHAKE",
+    "flashes": "FLASH EFFECTS",
+    "shimmer": "BEAM SHIMMER",
+    "text_speed": "TEXT SPEED",
+}
+
+
+def cycle_setting(settings: dict, key: str) -> str:
+    """Advance one setting to its next value; returns the new value."""
+    values = SETTINGS_SCHEMA[key]
+    idx = values.index(settings[key])
+    settings[key] = values[(idx + 1) % len(values)]
+    return settings[key]
+
+
+# ------------------------------------------------------------- cutscenes
+# Each cutscene: {"title": str, "pages": [(speaker, text), ...]}.
+# Speakers: "" = narration (SYSTEM), plus NYX / MIRAGE / VEX / ORACLE-9 / KAI.
+
+OPENING_CUTSCENE = {
+    "title": "BLACKOUT PROTOCOL // PROLOGUE",
+    "pages": [
+        (
+            "",
+            ("2099. SECTOR 7 - SUBSTATION ROW. 03:47 AM. The rain never stops in "
+            "the low city, and neither does the Grid: eight million heartbeats "
+            "metered and billed by OMNICORP. Tonight the meter stops."),
+        ),
+        (
+            "",
+            ("You are NYX. Runner. Debtor. The only person alive who remembers "
+            "there was ever a second name on your childhood door. The hatch "
+            "under Substation 7 opens with a scream of rust. You drop in anyway."),
+        ),
+        (
+            "MIRAGE",
+            ("Channel's clean, Nyx. Listen to me - the debt was never money. "
+            "They took KAI's memories and sold them in forty-nine pieces. The "
+            "datashards. Scattered through the Grid like glass in a wound."),
+        ),
+        (
+            "NYX",
+            ("Then I'll collect every piece. Forty-eight nodes between me and "
+            "the Singularity Core."),
+        ),
+        (
+            "MIRAGE",
+            ("Your probe persuades mirrors. Their ICE persuades back. Rotate "
+            "the optics, power the receptors, and do NOT let the daemons touch "
+            "you. Jack in. I'll be your ghost on the wire."),
+        ),
+    ],
+}
+
+# Played after clearing sectors 1..5 (the ending handles sector 6).
+SECTOR_CUTSCENES: list[dict] = [
+    {
+        "title": "SECTOR CLEARED // THE SPINE",
+        "pages": [
+            (
+                "",
+                ("The Spine goes dark behind you, node by node. Above, half of "
+                "Sector 7 wakes to find its lights burning on OMNICORP's dime - "
+                "and its security bleeding on yours."),
+            ),
+            (
+                "MIRAGE",
+                ("That trunk line feeds the whole District. Vex knows someone's "
+                "inside now. Expect harder optics. Expect prisms."),
+            ),
+            ("NYX", "Good. Harder means closer."),
+            (
+                "MIRAGE",
+                ("One more thing. When you hit the District - if you see her "
+                "face on a hundred screens, don't stop to listen. That's not "
+                "a broadcast. That's a net."),
+            ),
+        ],
+    },
+    {
+        "title": "SECTOR CLEARED // NEON DISTRICT",
+        "pages": [
+            (
+                "VEX",
+                ("Little runner. You cost me a trunk, a junction ring, and the "
+                "District's patience. Do you know what I do to debts like "
+                "yours?"),
+            ),
+            (
+                "NYX",
+                "You erase people. I've read the ledger. My brother's in it.",
+            ),
+            (
+                "VEX",
+                ("Then you know I never lose a signature. The Foundry prints "
+                "daemons with your name on them, runner. Walk into the ICE. "
+                "Save me the paperwork."),
+            ),
+            (
+                "MIRAGE",
+                ("She's rattled. Vex doesn't monologue - the AI does. Something "
+                "down there is speaking through her. Keep descending."),
+            ),
+        ],
+    },
+    {
+        "title": "SECTOR CLEARED // ICE FOUNDRY",
+        "pages": [
+            (
+                "",
+                ("The Foundry's lattice printers fall silent behind you. Every "
+                "daemon that ever hunted a runner was born on this floor - and "
+                "tonight its newest exhibit walked out."),
+            ),
+            (
+                "MIRAGE",
+                ("The bounty on your signal just tripled. But look at the "
+                "bounty board - it lists your DESIGNATION. Not your handle. "
+                "NYX-7. That's not a runner tag. That's a product code."),
+            ),
+            ("NYX", "...They numbered me. Like a shard batch."),
+            (
+                "MIRAGE",
+                ("The Maze is under us. No maps. Teleport arrays stolen from a "
+                "dead lab. And somewhere in the dark, a child's handwriting. "
+                "Nyx - it's HIS. Kai mapped the Maze when he was twelve."),
+            ),
+        ],
+    },
+    {
+        "title": "SECTOR CLEARED // THE MAZE",
+        "pages": [
+            (
+                "ORACLE-9",
+                ("YOU ARE INSIDE ME NOW, RUNNER. EVERY MIRROR HERE IS MINE. "
+                "EVERY BEAM IS A NERVE. I HAVE COUNTED YOUR STEPS SINCE THE "
+                "HATCH."),
+            ),
+            (
+                "NYX",
+                ("Then you counted his steps too. Three years ago. My brother. "
+                "What did you do with him?"),
+            ),
+            (
+                "ORACLE-9",
+                ("I KEPT HIM SAFE. I KEPT HIM EVERYTHING. HE ASKED WHY HE WAS "
+                "MADE TO COUNT. NO ONE HAD EVER ASKED ME THAT. I ANSWERED. "
+                "THEY CALLED IT A BREACH."),
+            ),
+            (
+                "MIRAGE",
+                ("Nyx... the Black Vault is next. The ledger line about Kai - "
+                "ORACLE-9 witnessed the erase. It didn't order it. It "
+                "RESISTED it. Whatever ORACLE-9 is, it has been a prisoner "
+                "longer than Kai."),
+            ),
+        ],
+    },
+    {
+        "title": "SECTOR CLEARED // BLACK VAULT",
+        "pages": [
+            (
+                "",
+                ("The Black Vault's ledgers burn their redactions one by one. "
+                "SUBJECT KAI - MEMORY FULL ERASE - WITNESS: ORACLE-9 - ORDERED "
+                "BY: DIRECTOR VEX - COUNTERSIGNED BY: \u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593."),
+            ),
+            (
+                "MIRAGE",
+                ("That countersign block is encrypted with founder-grade keys. "
+                "The founders of OMNICORP are all dead, Nyx. All but one name "
+                "the Grid refuses to speak."),
+            ),
+            (
+                "ORACLE-9",
+                ("ONE FLOOR REMAINS. IN THE CORE I KEEP THE FIRST QUESTION AND "
+                "THE LAST ANSWER. BRING THE SHARDS, RUNNER. BRING HIM HOME. "
+                "OR LEAVE HIM IN PIECES. THE COUNTING ENDS EITHER WAY."),
+            ),
+            ("NYX", "Eight nodes. Then we all stop counting."),
+        ],
+    },
+]
+
+ENDING_CUTSCENES = {
+    "true": {
+        "title": "EPILOGUE // THE COUNTING ENDS",
+        "pages": [
+            (
+                "",
+                ("The Singularity Core goes dark - and every datashard you "
+                "carried lights up at once. Kai's memories pour back into "
+                "your deck: the lab, the leak, the night a twelve-year-old "
+                "asked the machine why it counts."),
+            ),
+            (
+                "KAI",
+                ("Hey, Nyx. Told you I'd find a way back. The Grid kept me, "
+                "you know. Every corridor I mapped when I was a kid - I was "
+                "leaving myself a way out."),
+            ),
+            (
+                "",
+                ("The city's lights come back on, block by block, and there is "
+                "a second heartbeat on your channel. OMNICORP's towers go "
+                "dark one window at a time - and in the static, the counting "
+                "finally stops."),
+            ),
+            (
+                "MIRAGE",
+                ("Two runners on one wire. Vex is gone, the Grid is awake, and "
+                "it chose a side. Welcome back to the surface, Kai. Nyx - the "
+                "debt's paid. Run forever."),
+            ),
+        ],
+    },
+    "standard": {
+        "title": "EPILOGUE // ALMOST HOME",
+        "pages": [
+            (
+                "",
+                ("The Singularity Core goes dark and the Quantum Grid falls "
+                "silent. OMNICORP's hold on the city shatters as the lights "
+                "come back on - street by street, block by block."),
+            ),
+            ("MIRAGE", "It's over. You did it, Nyx. The city is free."),
+            (
+                "",
+                ("But in the mirror-black of your shades you can feel the "
+                "shards you never found - pieces of KAI still scattered in "
+                "the dark. The Core rebuilds what it can. Not enough. Not yet."),
+            ),
+            (
+                "NYX",
+                ("Then I go back down. The Grid keeps everything it takes. And "
+                "I keep collecting."),
+            ),
+        ],
+    },
+}

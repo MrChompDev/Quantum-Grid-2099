@@ -55,6 +55,16 @@ FLASH_WHITE = "1;97"  # VFX flash bursts
 ZONE_SIZE = 8
 ZONE_COUNT = 6
 
+# Speaker colors for cutscene dialogue.
+SPEAKER_COLORS = {
+    "": GRAY,  # narration (SYSTEM)
+    "NYX": WHITE,
+    "MIRAGE": CYAN,
+    "VEX": RED,
+    "ORACLE-9": ICE_MAGENTA,
+    "KAI": SHARD_YELLOW,
+}
+
 # Shake offsets cycled per frame while a shake is active (dx only).
 SHAKE_OFFSETS = (0, -2, 2, -1, 1, -2, 0, 2)
 
@@ -108,12 +118,12 @@ BEAM_GLYPHS_V = ("│", "║")
 BEAM_GLYPHS_X = ("┼", "╪")
 
 
-def _beam_color(frame: int) -> str:
-    return BEAM_GREEN if frame % 2 == 0 else BEAM_GREEN_HI
+def _beam_color(gi: int) -> str:
+    return BEAM_GREEN if gi % 2 == 0 else BEAM_GREEN_HI
 
 
-def _cell_str(game, x: int, y: int, frame: int = 0) -> str:
-    """Single glyph for one grid cell (1x scale)."""
+def _cell_str(game, x: int, y: int, gi: int = 0, flash_on: bool = True) -> str:
+    """Single glyph for one grid cell (1x scale). gi = shimmer variant."""
     layout = game.layout
     pos = (x, y)
     if pos == game.player:
@@ -121,7 +131,7 @@ def _cell_str(game, x: int, y: int, frame: int = 0) -> str:
     for en in game.daemons:
         if en["pos"] == pos:
             return _c(ICE_MAGENTA, assets.ENEMY_GLYPHS[en["kind"]])
-    if game.flash.get(pos, 0) > 0:
+    if flash_on and game.flash.get(pos, 0) > 0:
         return _c(FLASH_WHITE, "\u2726")  # VFX flash burst
     if pos in game.mirrors:
         return _c(MIRROR_CYAN, game.mirrors[pos])
@@ -146,69 +156,89 @@ def _cell_str(game, x: int, y: int, frame: int = 0) -> str:
         return _c(EXIT_LOCKED, assets.EXIT_GLYPH)
     h = pos in game.trace.h
     v = pos in game.trace.v
-    color = _beam_color(frame)
+    color = _beam_color(gi)
     if h and v:
-        return _c(color, BEAM_GLYPHS_X[frame % 2])
+        return _c(color, BEAM_GLYPHS_X[gi])
     if h:
-        return _c(color, BEAM_GLYPHS_H[frame % 2])
+        return _c(color, BEAM_GLYPHS_H[gi])
     if v:
-        return _c(color, BEAM_GLYPHS_V[frame % 2])
+        return _c(color, BEAM_GLYPHS_V[gi])
     return _c(FLOOR_GRAY, assets.FLOOR_GLYPH)
 
 
-def _cell_2x(game, x: int, y: int, frame: int = 0) -> tuple[str, str]:
-    """Two-row pair of 2-char strings for one grid cell (2x pixel-doubled)."""
+def _cell_block(game, x: int, y: int, gi: int, flash_on: bool, sx: int, sy: int) -> list[str]:
+    """One grid cell as `sy` rows of `sx` chars (per-axis pixel scaling).
+
+    Square blocks (sx == sy) get true diagonal mirrors; everything else
+    duplicates the glyph.
+    """
     layout = game.layout
     pos = (x, y)
-    if pos == game.player:
-        return (_c(PLAYER_BLUE_ON_BLACK, "@@"),) * 2
-    for en in game.daemons:
-        if en["pos"] == pos:
-            g = assets.ENEMY_GLYPHS[en["kind"]]
-            return (_c(ICE_MAGENTA, g * 2),) * 2
-    if game.flash.get(pos, 0) > 0:
-        return (_c(FLASH_WHITE, "\u2726\u2726"),) * 2
-    if pos in game.mirrors:
-        g = game.mirrors[pos]
-        return (
-            (_c(MIRROR_CYAN, f" {g}"), _c(MIRROR_CYAN, f"{g} "))
-            if g == "/"
-            else (_c(MIRROR_CYAN, f"{g} "), _c(MIRROR_CYAN, f" {g}"))
-        )
-    raw = layout.rows[y][x]
-    if raw == WALL:
-        return (_c(WALL_BLUE, assets.WALL_GLYPH * 2),) * 2
-    if raw in EMITTER_CHARS:
-        g = assets.EMITTER_GLYPHS.get(raw, raw)
-        return (_c(EMITTER_RED, g * 2),) * 2
-    if raw == SPLITTER:
-        return (_c(MIRROR_CYAN, assets.SPLITTER_GLYPH * 2),) * 2
-    if raw in ("T", "U"):
-        g = assets.PAD_GLYPHS.get(raw, raw)
-        return (_c(PAD_MAGENTA, g * 2),) * 2
-    if raw == SHARD and pos not in game.shards_taken:
-        return (_c(SHARD_YELLOW, assets.SHARD_GLYPH * 2),) * 2
-    if raw == "*":
-        if pos in game.trace.powered:
-            return (_c(RECEPTOR_YELLOW_HI, assets.RECEPTOR_GLYPH * 2),) * 2
-        return (_c(RECEPTOR_YELLOW, assets.RECEPTOR_GLYPH * 2),) * 2
-    if raw == EXIT:
-        if game.exit_active():
-            return (_c(EXIT_ACTIVE, assets.EXIT_GLYPH * 2),) * 2
-        return (_c(EXIT_LOCKED, assets.EXIT_GLYPH * 2),) * 2
-    h = pos in game.trace.h
-    v = pos in game.trace.v
-    color = _beam_color(frame)
-    if h and v:
-        return (
-            _c(color, BEAM_GLYPHS_H[frame % 2] * 2),
-            _c(color, BEAM_GLYPHS_V[frame % 2] * 2),
-        )
-    if h:
-        return (_c(color, BEAM_GLYPHS_H[frame % 2] * 2),) * 2
-    if v:
-        return (_c(color, BEAM_GLYPHS_V[frame % 2] * 2),) * 2
-    return ("  ", "  ")
+    n = sx
+    if sx == sy:
+        if pos == game.player:
+            return [_c(PLAYER_BLUE_ON_BLACK, "@" * n)] * n
+        for en in game.daemons:
+            if en["pos"] == pos:
+                g = assets.ENEMY_GLYPHS[en["kind"]]
+                return [_c(ICE_MAGENTA, g * n)] * n
+        if flash_on and game.flash.get(pos, 0) > 0:
+            return [_c(FLASH_WHITE, "\u2726" * n)] * n
+        if pos in game.mirrors:
+            g = game.mirrors[pos]
+            color = MIRROR_CYAN
+            if g == "/":  # rising diagonal: bottom-left -> top-right
+                return [
+                    _c(color, " " * (n - 1 - i) + "/" + " " * i)
+                    for i in range(n)
+                ]
+            # falling diagonal: top-left -> bottom-right
+            return [
+                _c(color, " " * i + "\\" + " " * (n - 1 - i))
+                for i in range(n)
+            ]
+        raw = layout.rows[y][x]
+        if raw == WALL:
+            return [_c(WALL_BLUE, assets.WALL_GLYPH * n)] * n
+        if raw in EMITTER_CHARS:
+            g = assets.EMITTER_GLYPHS.get(raw, raw)
+            return [_c(EMITTER_RED, g * n)] * n
+        if raw == SPLITTER:
+            return [_c(MIRROR_CYAN, assets.SPLITTER_GLYPH * n)] * n
+        if raw in ("T", "U"):
+            g = assets.PAD_GLYPHS.get(raw, raw)
+            return [_c(PAD_MAGENTA, g * n)] * n
+        if raw == SHARD and pos not in game.shards_taken:
+            return [_c(SHARD_YELLOW, assets.SHARD_GLYPH * n)] * n
+        if raw == "*":
+            if pos in game.trace.powered:
+                return [_c(RECEPTOR_YELLOW_HI, assets.RECEPTOR_GLYPH * n)] * n
+            return [_c(RECEPTOR_YELLOW, assets.RECEPTOR_GLYPH * n)] * n
+        if raw == EXIT:
+            if game.exit_active():
+                return [_c(EXIT_ACTIVE, assets.EXIT_GLYPH * n)] * n
+            return [_c(EXIT_LOCKED, assets.EXIT_GLYPH * n)] * n
+        h = pos in game.trace.h
+        v = pos in game.trace.v
+        color = _beam_color(gi)
+        if h and v:
+            return [
+                _c(color, BEAM_GLYPHS_H[gi] * n),
+                *[_c(color, BEAM_GLYPHS_V[gi] * n)] * (n - 1),
+            ]
+        if h:
+            return [_c(color, BEAM_GLYPHS_H[gi] * n)] * n
+        if v:
+            return [_c(color, BEAM_GLYPHS_V[gi] * n)] * n
+        return [_c(FLOOR_GRAY, assets.FLOOR_GLYPH * n)] * n
+    # Non-square block: duplicate the 1x glyph horizontally/vertically.
+    glyph = _cell_str(game, x, y, gi, flash_on)
+    plain_glyph = _strip_ansi(glyph)
+    code = None
+    if glyph.startswith(ESC + "["):
+        code = glyph[2 : glyph.index("m")]
+    row = _c(code, plain_glyph * sx) if code else plain_glyph * sx
+    return [row] * sy
 
 
 def _bandwidth_bar(bandwidth: int) -> str:
@@ -285,14 +315,23 @@ def _emit(lines: list[str], width: int, height: int, home: str) -> str:
     return "".join(out)
 
 
-def _grid_scale(game, width: int, height: int) -> int:
-    """2x pixel-doubling when the terminal can fit the doubled grid."""
-    if (
-        game.layout.width * 2 <= width - 4
-        and game.layout.height * 2 <= height - 5
-    ):
-        return 2
-    return 1
+def _grid_scale(game, width: int, height: int) -> tuple[int, int]:
+    """Per-axis pixel scaling: (sx, sy), each 1..3 when the terminal fits.
+
+    Cells go wider and taller independently - on an 80x24 terminal early
+    nodes render 2x wider; huge grids stay 1x; big terminals get 3x3.
+    """
+    sx = 1
+    for s in (3, 2):
+        if (game.layout.width + 2) * s + 2 <= width:
+            sx = s
+            break
+    sy = 1
+    for s in (3, 2):
+        if game.layout.height * s + 4 <= height:
+            sy = s
+            break
+    return sx, sy
 
 
 def render_frame(
@@ -302,16 +341,25 @@ def render_frame(
     total_score: int = 0,
     frame: int = 0,
     music_on: bool = True,
+    vfx: dict | None = None,
 ) -> str:
-    """Build the gameplay frame filling the terminal, grid as large as fits."""
+    """Build the gameplay frame filling the terminal, grid as large as fits.
+
+    vfx toggles (from settings): shake / flashes / shimmer, defaulting on.
+    """
     width = max(width, MIN_W)
     height = max(height, MIN_H)
-    scale = _grid_scale(game, width, height)
-    grid_w = (game.layout.width + 2) * scale
+    vfx = vfx or {}
+    shake_on = vfx.get("shake", True)
+    flash_on = vfx.get("flashes", True)
+    shimmer_on = vfx.get("shimmer", True)
+    gi = (frame % 2) if shimmer_on else 0
+    sx, sy = _grid_scale(game, width, height)
+    grid_w = (game.layout.width + 2) * sx
     indent = max(1, (width - grid_w) // 2)
-    if game.shake > 0:
+    if game.shake > 0 and shake_on:
         indent = max(0, indent + SHAKE_OFFSETS[frame % len(SHAKE_OFFSETS)])
-    rule_color = RED if game.shake > 1 else WALL_BLUE
+    rule_color = (RED if game.shake > 1 else WALL_BLUE) if (game.shake > 1 and shake_on) else WALL_BLUE
     danger = any(
         en["kind"] == "hunter"
         and en.get("stun", 0) <= 0
@@ -321,7 +369,7 @@ def render_frame(
 
     # chrome: rule + 2 HUD lines + grid + status + controls (footer pinned)
     chrome = 5
-    rows = game.layout.height * scale
+    rows = game.layout.height * sy
     flex = max(0, height - chrome - rows)
     pad_above = flex // 2
     pad_below = flex - pad_above
@@ -329,22 +377,22 @@ def render_frame(
     lines: list[str] = [_rule(width, rule_color)]
     lines.extend(_header_lines(game, total_score))
     lines.extend([""] * pad_above)
-    if scale == 2:
-        for y in range(game.layout.height):
-            top = []
-            bot = []
-            for x in range(game.layout.width):
-                t, b = _cell_2x(game, x, y, frame)
-                top.append(t)
-                bot.append(b)
-            lines.append(" " * indent + "".join(top))
-            lines.append(" " * indent + "".join(bot))
-    else:
-        for y in range(game.layout.height):
-            row = "".join(
-                _cell_str(game, x, y, frame) for x in range(game.layout.width)
+    for y in range(game.layout.height):
+        if sx == 1 and sy == 1:
+            lines.append(
+                " " * indent
+                + "".join(
+                    _cell_str(game, x, y, gi, flash_on)
+                    for x in range(game.layout.width)
+                )
             )
-            lines.append(" " * indent + row)
+            continue
+        blocks = [
+            _cell_block(game, x, y, gi, flash_on, sx, sy)
+            for x in range(game.layout.width)
+        ]
+        for r in range(sy):
+            lines.append(" " * indent + "".join(b[r] for b in blocks))
     lines.extend([""] * pad_below)
     lines.append(
         f"  {_c(GRAY, 'STATUS:')} {_c(YELLOW, _truncate(game.msg, width - 14))}"
@@ -497,7 +545,7 @@ def render_zone_select(
     body.extend(
         [
             "",
-            "  Press 1-6 to enter a sector | ENTER: next node | C: codex | M: sound | Q: quit",
+            "  1-6: sector | ENTER: next node | C: codex | O: options | M: sound | Q: quit",
         ]
     )
     return _screen(body, width, height)
@@ -561,7 +609,7 @@ def render_node_select(
     body.extend(
         [
             "",
-            "  Press 1-8 to jack in | ENTER: next uncleared node | C: codex | Q: disconnect",
+            "  1-8: node | ENTER: next uncleared | C: codex | O: options | Q: disconnect",
         ]
     )
     return _screen(body, width, height)
@@ -720,6 +768,29 @@ def render_level_complete(
     return _screen(body, width, height, clear=False)
 
 
+def render_sector_clear(
+    zone, session_score: int, width: int = MIN_W, height: int = MIN_H, frame: int = 0
+) -> str:
+    """Intermission between sectors: the MIRAGE beat + run stats."""
+    body = [
+        "",
+        _center(_blink("*** SECTOR CLEARED ***", frame, BEAM_GREEN), width),
+        "",
+        *_indent(_colored_banner("SECTOR", CYAN)),
+        "",
+        _center(_c(WHITE, f"SECTOR {zone.number:02d} - {zone.name}"), width),
+        _center(_c(GRAY, zone.tagline), width),
+        "",
+        *_wrap_center(zone.clear_text, width, color=SHARD_YELLOW),
+        "",
+        _center(f"RUN TOTAL {_c(YELLOW, str(session_score))} PTS", width),
+        _center(_c(BEAM_GREEN, "BANDWIDTH REFRESHED TO 100%"), width),
+        "",
+        _center(_blink(">>> PRESS ANY KEY TO DESCEND <<<", frame, BEAM_GREEN), width),
+    ]
+    return _screen(body, width, height, clear=False)
+
+
 def render_game_over(game, width: int = MIN_W, height: int = MIN_H, frame: int = 0) -> str:
     from .levels import GAMEOVER_LORE
 
@@ -802,4 +873,99 @@ def render_goodbye(width: int = MIN_W, height: int = MIN_H) -> str:
             "Quantum Grid 2099 // uplink closed. See you on the next floor.", width
         ),
     ]
+    return _screen(body, width, height)
+
+
+# ---------------------------------------------------------------- cutscenes
+
+
+def _cutscene_page(cutscene: dict, page: int) -> tuple[str, list[str], int]:
+    """Return (speaker, wrapped_lines, total_chars) for a cutscene page."""
+    import textwrap
+
+    speaker, text = cutscene["pages"][page]
+    lines = textwrap.wrap(text, width=max(20, width_limit(cutscene)))
+    total = sum(len(line) for line in lines)
+    return speaker, lines, total
+
+
+def width_limit(cutscene: dict) -> int:
+    return 68  # text wrap width for cutscene pages
+
+
+def _reveal(lines: list[str], shown: int) -> list[str]:
+    """Take the first `shown` characters across wrapped lines."""
+    out = []
+    budget = shown
+    for line in lines:
+        if budget <= 0:
+            break
+        out.append(line if budget >= len(line) else line[:budget])
+        budget -= len(line)
+    return out
+
+
+def render_cutscene(
+    cutscene: dict,
+    page: int,
+    shown: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
+    frame: int = 0,
+) -> str:
+    """Typewriter-animated cutscene screen with a speaker tag per page."""
+    speaker, lines, total = _cutscene_page(cutscene, page)
+    color = SPEAKER_COLORS.get(speaker, WHITE)
+    body: list[str] = [
+        _center(_c(CYAN, _truncate(cutscene["title"], width - 4)), width),
+        "",
+    ]
+    if speaker:
+        body.append(_center(_c(color, f"\u00bb {speaker}"), width))
+        body.append("")
+    for line in _reveal(lines, shown):
+        body.append(_center(_c(color, line), width))
+    body.append("")
+    if shown >= total:
+        more = page < len(cutscene["pages"]) - 1
+        prompt = "ENTER: MORE   X: SKIP" if more else "ENTER: CONTINUE   X: SKIP"
+        body.append(_center(_blink("\u25bc " + prompt, frame, BEAM_GREEN), width))
+    else:
+        body.append(_center(_c(GRAY, "..."), width))
+    return _screen(body, width, height, clear=False)
+
+
+def cutscene_page_len(cutscene: dict, page: int) -> int:
+    return _cutscene_page(cutscene, page)[2]
+
+
+# ------------------------------------------------------------------ settings
+
+
+def render_settings(
+    settings: dict,
+    selected: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    from .lore import SETTING_LABELS, SETTINGS_SCHEMA
+
+    body = [
+        _center(_c(CYAN, "SYSTEM SETTINGS"), width),
+        _center(_c(GRAY, "changes save to your runner profile instantly"), width),
+        "",
+    ]
+    keys = list(SETTINGS_SCHEMA)
+    for i, key in enumerate(keys):
+        marker = _c(BEAM_GREEN, ">") if i == selected else _c(GRAY, " ")
+        label = SETTING_LABELS[key].ljust(15)
+        value = settings[key].upper()
+        line = f"  {marker} {_c(WHITE, label)} {_c(BEAM_GREEN, value)}"
+        body.append(_center(line, width))
+    body.extend(
+        [
+            "",
+            "  W/S: select | ENTER: toggle | Q: back",
+        ]
+    )
     return _screen(body, width, height)

@@ -24,6 +24,8 @@ def save_path(username: str) -> str:
 
 
 def default_save() -> dict:
+    from .lore import DEFAULT_SETTINGS
+
     return {
         "version": SAVE_VERSION,
         "unlocked": 0,
@@ -32,6 +34,7 @@ def default_save() -> dict:
         "shards": {},  # global node index (str) -> sorted list of shard indexes
         "codex": [],
         "endings": [],
+        "settings": dict(DEFAULT_SETTINGS),
     }
 
 

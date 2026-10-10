@@ -51,13 +51,19 @@ class Client:
 
     async def read_until(self, *needles: str, timeout: float = 25.0) -> str:
         start_len = len(self.buf)
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
 
         async def _pump():
-            while True:
+            # absolute deadline: the game streams animated frames (typewriter
+            # cutscenes, fx loop), so per-read timeouts never fire
+            while loop.time() < deadline:
                 delta = strip_ansi(self.buf[start_len:])
                 if any(n in delta for n in needles):
                     return
-                chunk = await asyncio.wait_for(self.stdout.read(8192), timeout)
+                chunk = await asyncio.wait_for(
+                    self.stdout.read(8192), max(0.05, deadline - loop.time())
+                )
                 if not chunk:
                     return
                 self.buf += chunk
@@ -127,18 +133,14 @@ async def main() -> int:
 
             await c.read_until("JACK IN")
             c.send(" ")
+            await c.read_until("PROLOGUE")
+            c.send("x")  # skip the opening cutscene
             await c.read_until("SECTOR ACCESS")
             c.send("\r")  # sector select -> node select (sector 1)
-            await c.read_until("Press 1-8")
+            await c.read_until("1-8: node")
             print("connected; starting full campaign...", flush=True)
 
             for i, defn in enumerate(LEVELS):
-                if i > 0 and i % 8 == 0:
-                    # previous sector just completed: node select -> sector select
-                    c.send("\r")
-                    await c.read_until("SECTOR ACCESS")
-                    c.send("\r")  # jump into the next sector
-                    await c.read_until("Press 1-8")
                 c.send("\r")  # node select -> level intro
                 await c.read_until("PRESS ANY KEY TO ENGAGE")
                 c.send(" ")
@@ -146,7 +148,9 @@ async def main() -> int:
                 keys = solve_keys(defn)
                 c.send("".join(keys))
                 if i == len(LEVELS) - 1:
-                    # final node goes straight to the victory screen
+                    # final node: ending cutscene, then the victory screen
+                    await c.read_until("EPILOGUE")
+                    c.send("x")  # skip the ending cutscene
                     await c.read_until("MAINFRAME COMPROMISED")
                     print(
                         f"NODE {i + 1:02d} - {defn.name}: cleared ({len(keys)} actions)",
@@ -159,8 +163,16 @@ async def main() -> int:
                         f"NODE {i + 1:02d} - {defn.name}: cleared ({len(keys)} actions)",
                         flush=True,
                     )
-                    c.send(" ")  # dismiss complete screen -> node select
-                    await c.read_until("Press 1-8")
+                    c.send(" ")  # dismiss complete screen
+                    if (i + 1) % 8 == 0:
+                        # sector boundary: cutscene + stats intermission
+                        await c.read_until("SECTOR CLEARED")
+                        c.send("x")  # skip the cutscene pages
+                        await c.read_until("PRESS ANY KEY TO DESCEND")
+                        c.send(" ")
+                        await c.read_until("SECTOR ACCESS")
+                        c.send("\r")  # jump into the next sector
+                    await c.read_until("1-8: node")
 
             c.send(" ")  # dismiss the victory screen -> session ends
             await c.read_until("CONNECTION TERMINATED", timeout=5)

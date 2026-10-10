@@ -241,3 +241,32 @@ class TestEnemyBlocking:
         assert cell_blocked_for_enemy(layout, set(), (11, 3))  # exit
         assert cell_blocked_for_enemy(layout, set(), (0, 0))  # border
         assert not cell_blocked_for_enemy(layout, set(), (3, 1))  # floor
+
+
+class TestCorruptorTargetShift:
+    def test_corruptor_shifts_targets(self):
+        """The corruptor must not pin a single mirror: over a window it
+        seeks different targets (it may re-flip one en route, but the
+        target shifts)."""
+        game = make_game(
+            [
+                "#............#",
+                "#.C/.........#",
+                "#............#",
+                "#............#",
+                "#..../.......#",
+                "#....@...E...#",
+                "#>....*......#",
+            ],
+            seed=1,
+        )
+        (corr,) = game.daemons
+        first = (3, 2)
+        # tick 1: flips the adjacent mirror
+        step_daemons(game)
+        assert corr["last_target"] == first
+        seen = {corr["last_target"]}
+        for _ in range(40):
+            step_daemons(game)
+            seen.add(corr["last_target"])
+        assert seen >= {first, (5, 5)}, f"corruptor pinned one mirror: {seen}"

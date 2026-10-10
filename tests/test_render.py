@@ -18,18 +18,18 @@ def test_scale1_frame_fits_80x24():
 
 
 def test_scale2_doubles_small_grids_on_big_terminals():
-    game = Game(0, 100)  # 26x11 grid -> 52x22 doubled: fits 120x40
-    assert R._grid_scale(game, 120, 40) == 2
+    game = Game(0, 100)  # 26x11 grid
+    assert R._grid_scale(game, 120, 40) == (3, 3)  # full tripling fits
     out = R.render_frame(game, 120, 40)
-    assert "@@" in plain(out)  # doubled player
+    assert "@@@" in plain(out)  # tripled player
     lines = out.count("\r\n") + 1
     assert lines == 40
 
 
 def test_scale1_keeps_big_grids_on_small_terminals():
     game = Game(47, 100)  # 72x16 grid: doubled = 144 wide, too big for 80
-    assert R._grid_scale(game, 80, 24) == 1
-    assert R._grid_scale(game, 200, 50) == 2  # but scales on a huge terminal
+    assert R._grid_scale(game, 80, 24) == (1, 1)
+    assert R._grid_scale(game, 200, 50) == (2, 2)  # but scales on a huge terminal
 
 
 def test_beam_shimmer_alternates():
@@ -100,3 +100,81 @@ def test_victory_screen_ranks_and_animates():
     out2 = R.render_victory(save, 96, 80, 24, frame=2)
     assert "LEGEND OF THE GRID" in plain(out0)
     assert plain(out0) != plain(out2)
+
+
+def test_sector_clear_intermission():
+    from qgrid.lore import ZONES
+
+    zone = ZONES[0]
+    out0 = R.render_sector_clear(zone, 12345, 80, 24, frame=0)
+    out2 = R.render_sector_clear(zone, 12345, 80, 24, frame=2)
+    text = plain(out0)
+    assert "SECTOR CLEARED" in text
+    assert "SECTOR 01 - THE SPINE" in text
+    assert "MIRAGE" in text  # the lore beat quotes her
+    assert "12345" in text
+    assert out0 != out2  # animated blink (bright vs dimmed color)
+
+
+def test_cutscene_renders_speaker_and_reveal():
+    from qgrid.lore import OPENING_CUTSCENE
+
+    out = R.render_cutscene(OPENING_CUTSCENE, 0, 10, 80, 24, 0)
+    text = plain(out)
+    assert "PROLOGUE" in text
+    assert "2099. SECT" in text  # partial typewriter reveal
+    assert "Tonight the meter stops" not in text
+    assert "MIRAGE" not in text  # speaker 0 is narration
+    assert "..." in text  # still typing
+
+    full = R.cutscene_page_len(OPENING_CUTSCENE, 0)
+    out = R.render_cutscene(OPENING_CUTSCENE, 0, full, 80, 24, 0)
+    text = plain(out)
+    assert "Tonight the meter stops." in text
+    assert "ENTER: MORE" in text  # page 0 of 5 -> more pages
+
+    # dialogue page carries the speaker tag in its color
+    out = R.render_cutscene(OPENING_CUTSCENE, 2, 999, 80, 24, 0)
+    assert "\u00bb MIRAGE" in plain(out)
+
+
+def test_cutscene_last_page_prompt():
+    from qgrid.lore import OPENING_CUTSCENE
+
+    last = len(OPENING_CUTSCENE["pages"]) - 1
+    total = R.cutscene_page_len(OPENING_CUTSCENE, last)
+    out = R.render_cutscene(OPENING_CUTSCENE, last, total, 80, 24, 0)
+    assert "ENTER: CONTINUE" in plain(out)
+
+
+def test_settings_screen_renders_and_marks_selection():
+    from qgrid.lore import DEFAULT_SETTINGS
+
+    s = dict(DEFAULT_SETTINGS)
+    out = R.render_settings(s, 0, 80, 24)
+    text = plain(out)
+    for label in ("SOUND", "SCREEN SHAKE", "FLASH EFFECTS", "BEAM SHIMMER", "TEXT SPEED"):
+        assert label in text
+    assert ">" in text and "FULL" in text and "NORMAL" in text
+
+
+def test_vfx_toggles_off():
+    game = Game(0, 100)
+    game.flash[game.layout.receptors[0]] = 3
+    game.shake = 3
+    out = R.render_frame(game, 80, 24, vfx={"shake": False, "flashes": False, "shimmer": False})
+    text = plain(out)
+    assert "\u2726" not in text  # flashes off
+    assert f"{R.ESC}[{R.RED}m=" not in out  # no red alert rule
+    # shimmer off: beam glyphs stay at variant 0 on any frame
+    out1 = R.render_frame(game, 80, 24, frame=1, vfx={"shimmer": False})
+    assert R.BEAM_GLYPHS_H[0] in plain(out1)
+
+
+def test_per_axis_scale_tiers():
+    game = Game(0, 100)  # 26x11
+    assert R._grid_scale(game, 80, 24) == (2, 1)  # wide doubling on 80x24
+    assert R._grid_scale(game, 120, 40) == (3, 3)  # full 3x3 on big terminals
+    big = Game(47, 100)  # 72x16
+    assert R._grid_scale(big, 80, 24) == (1, 1)
+    assert R._grid_scale(big, 200, 50) == (2, 2)

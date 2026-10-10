@@ -18,7 +18,19 @@ from . import audio
 from . import save as save_mod
 from .game import DIR_VECTORS, Game, start_bandwidth
 from .levels import LEVELS
-from .lore import CODEX, CODEX_ON_NODE, CODEX_ON_START, CODEX_ON_ZONE
+from .lore import (
+    CODEX,
+    CODEX_ON_NODE,
+    CODEX_ON_START,
+    CODEX_ON_ZONE,
+    DEFAULT_SETTINGS,
+    ENDING_CUTSCENES,
+    OPENING_CUTSCENE,
+    SECTOR_CUTSCENES,
+    SETTINGS_SCHEMA,
+    SHARDS_FOR_TRUE_ENDING,
+    cycle_setting,
+)
 from .render import (
     CLEAR,
     MIN_H,
@@ -27,6 +39,7 @@ from .render import (
     ZONE_COUNT,
     ZONE_SIZE,
     render_codex,
+    render_cutscene,
     render_frame,
     render_game_over,
     render_goodbye,
@@ -34,6 +47,8 @@ from .render import (
     render_level_intro,
     render_node_select,
     render_save_menu,
+    render_sector_clear,
+    render_settings,
     render_title,
     render_victory,
     render_zone_select,
@@ -85,9 +100,15 @@ class Session:
         self.total_actions = 0
         self.session_score = 0
         self.width, self.height = self._frame_size()
+        # settings (persisted in the save; live-applied)
+        st = self.save.get("settings")
+        self.settings = dict(DEFAULT_SETTINGS)
+        if isinstance(st, dict):
+            self.settings.update({k: st[k] for k in DEFAULT_SETTINGS if k in st})
         # --- audio + VFX state ---
         self.tone = audio.Tone(self.write)
         self.player = audio.MusicPlayer(self.tone)
+        self.player.mode = self.settings["sound"]
         self.frame_no = 0
         self._fx_game: Game | None = None
         self._fx_task: asyncio.Task | None = None
@@ -133,7 +154,8 @@ class Session:
             if ch in DIR_VECTORS:
                 return ch
             if ch in (
-                "r", "R", "k", "K", "c", "C", "n", "N", "m", "M", "s", "S", "w", "W"
+                "r", "R", "k", "K", "c", "C", "n", "N", "m", "M", "o", "O",
+                "s", "S", "w", "W", "x", "X",
             ):
                 return ch.lower()
             if ch.isdigit() or ch in ("\r", "\n", " "):
@@ -183,6 +205,9 @@ class Session:
 
     def toggle_sound(self) -> None:
         self.player.cycle_mode()
+        self.settings["sound"] = self.player.mode
+        self.save["settings"] = dict(self.settings)
+        save_mod.store(self.username, self.save)
         if self.player.sfx_on:
             self.player.sfx("menu")
 
@@ -216,6 +241,7 @@ class Session:
                     self.session_score,
                     self.frame_no,
                     self.player.music_on,
+                    self._vfx(),
                 )
             )
 
@@ -276,6 +302,9 @@ class Session:
             )
             if frame is QUIT:
                 return
+            result = await self._play_cutscene(OPENING_CUTSCENE)
+            if result == "quit":
+                return
             await self._save_menu()
             for key in CODEX_ON_START:
                 self.unlock_codex(key)
@@ -286,6 +315,17 @@ class Session:
                     return
                 if result == "victory":
                     self.player.set_song(None)
+                    self.player.sfx("victory")
+                    banked = sum(len(v) for v in self.save.get("shards", {}).values())
+                    true_end = (
+                        _total_shards_in_game() > 0
+                        and banked
+                        >= SHARDS_FOR_TRUE_ENDING * _total_shards_in_game()
+                    )
+                    ending_cut = ENDING_CUTSCENES["true" if true_end else "standard"]
+                    result = await self._play_cutscene(ending_cut)
+                    if result == "quit":
+                        return
                     self.player.sfx("victory")
                     ending = await self._show_animated(
                         lambda f: render_victory(
@@ -367,6 +407,82 @@ class Session:
     def _sector_for(self, index: int) -> int:
         return index // ZONE_SIZE + 1
 
+    async def _play_cutscene(self, cutscene: dict) -> str:
+        """Typewriter cutscene: any key reveals/advances, X skips all.
+        Returns "quit", "skipped" or "done"."""
+        from .render import cutscene_page_len
+
+        page = 0
+        shown = 0
+        speed = self.settings.get("text_speed", "normal")
+        delay, cps = {
+            "normal": (0.035, 2),
+            "fast": (0.02, 5),
+            "instant": (0.16, 9999),
+        }[speed]
+        while True:
+            self.width, self.height = self._frame_size()
+            self.frame_no += 1
+            self.write(
+                render_cutscene(
+                    cutscene, page, shown, self.width, self.height, self.frame_no
+                )
+            )
+            key = await self.read_key_or_wait(delay)
+            if key is QUIT:
+                return "quit"
+            total = cutscene_page_len(cutscene, page)
+            if key is _TIMEOUT:
+                shown = min(total, shown + cps)
+                continue
+            if key == "x":
+                self.player.sfx("menu")
+                return "skipped"
+            # any other key: reveal the page, then advance
+            if shown < total:
+                shown = total
+                continue
+            page += 1
+            shown = 0
+            self.player.sfx("menu")
+            if page >= len(cutscene["pages"]):
+                return "done"
+
+    async def _settings_screen(self) -> None:
+        sel = 0
+        while True:
+            self.width, self.height = self._frame_size()
+            self.write(
+                CLEAR
+                + render_settings(self.settings, sel, self.width, self.height)
+            )
+            key = await self.read_key()
+            if key is QUIT or key in ("q", "c"):
+                return
+            keys = list(SETTINGS_SCHEMA)
+            if key in ("w", "s"):
+                sel = (sel + (-1 if key == "w" else 1)) % len(keys)
+                self.player.sfx("blip")
+            elif key in ("\r", "\n", " "):
+                k = keys[sel]
+                cycle_setting(self.settings, k)
+                self.save["settings"] = dict(self.settings)
+                save_mod.store(self.username, self.save)
+                self._apply_settings()
+                self.player.sfx("menu")
+
+    def _apply_settings(self) -> None:
+        self.player.mode = self.settings["sound"]
+        self.save["settings"] = dict(self.settings)
+        save_mod.store(self.username, self.save)
+
+    def _vfx(self) -> dict:
+        return {
+            "shake": self.settings.get("shake", "on") == "on",
+            "flashes": self.settings.get("flashes", "on") == "on",
+            "shimmer": self.settings.get("shimmer", "on") == "on",
+        }
+
     async def _sector_flow(self) -> str:
         """Sector select -> node select -> play. Returns quit/victory/loop."""
         self.player.set_song("title")
@@ -387,11 +503,15 @@ class Session:
             if key == "c":
                 await self._codex_screen()
                 continue
+            if key == "o":
+                self.player.sfx("menu")
+                await self._settings_screen()
+                continue
             if key in ("\r", "\n", " "):
                 self.player.sfx("menu")
                 index = self._first_uncleared()
                 result = await self._node_flow(self._sector_for(index))
-                if result != "back":
+                if result not in ("back", "sector"):
                     return result
                 continue
             if key and key.isdigit() and key != "0":
@@ -404,7 +524,7 @@ class Session:
                     if unlocked:
                         self.player.sfx("menu")
                         result = await self._node_flow(zone)
-                        if result != "back":
+                        if result not in ("back", "sector"):
                             return result
 
     async def _node_flow(self, zone: int) -> str:
@@ -425,6 +545,10 @@ class Session:
                 continue
             if key == "c":
                 await self._codex_screen()
+                continue
+            if key == "o":
+                self.player.sfx("menu")
+                await self._settings_screen()
                 continue
             if key in ("\r", "\n", " "):
                 cleared_all = self.save.get("unlocked", 0) >= start + ZONE_SIZE
@@ -474,7 +598,7 @@ class Session:
         self.write(
             render_frame(
                 game, self.width, self.height, self.session_score,
-                self.frame_no, self.player.music_on,
+                self.frame_no, self.player.music_on, self._vfx(),
             )
         )
         try:
@@ -488,7 +612,7 @@ class Session:
                     self.write(
                         render_frame(
                             game, self.width, self.height, self.session_score,
-                            self.frame_no, self.player.music_on,
+                            self.frame_no, self.player.music_on, self._vfx(),
                         )
                     )
                     continue
@@ -497,7 +621,7 @@ class Session:
                     self.write(
                         render_frame(
                             game, self.width, self.height, self.session_score,
-                            self.frame_no, self.player.music_on,
+                            self.frame_no, self.player.music_on, self._vfx(),
                         )
                     )
                     continue
@@ -527,6 +651,26 @@ class Session:
                     )
                     if key is QUIT:
                         return "quit"
+                    if index % ZONE_SIZE == ZONE_SIZE - 1:
+                        # sector complete: cutscene with the lore beat, then
+                        # the stats intermission
+                        self.player.sfx("all_powered")
+                        cut = SECTOR_CUTSCENES[defn.zone - 1]
+                        result = await self._play_cutscene(cut)
+                        if result == "quit":
+                            return "quit"
+                        from .lore import ZONES
+
+                        zone = ZONES[defn.zone - 1]
+                        key = await self._show_animated(
+                            lambda f, z=zone: render_sector_clear(
+                                z, self.session_score,
+                                self.width, self.height, f,
+                            )
+                        )
+                        if key is QUIT:
+                            return "quit"
+                        return "sector"  # back to sector select
                     return "next"
                 if game.game_over:
                     self._fx_game = None  # stop the idle VFX loop
@@ -542,7 +686,7 @@ class Session:
                 self.write(
                     render_frame(
                         game, self.width, self.height, self.session_score,
-                        self.frame_no, self.player.music_on,
+                        self.frame_no, self.player.music_on, self._vfx(),
                     )
                 )
         finally:

@@ -93,36 +93,62 @@ def _step_hunter(layout, en: dict, player, occupied: set[tuple[int, int]], rng) 
 def _step_corruptor(
     layout, en: dict, mirrors, occupied: set[tuple[int, int]], rng
 ) -> tuple[int, int] | None:
-    """Flip an adjacent mirror, then wander off for a few ticks (cooldown) so
-    runners get a window to restore their optics. Returns new pos or None."""
+    """Flip an adjacent mirror, wander off for a few ticks (cooldown), then
+    seek a DIFFERENT mirror - no single optic ever gets pinned (with two or
+    more mirrors, every mirror gets stability windows). Returns new pos or
+    None."""
     px, py = _pos(en)
+    last = en.get("last_target")
     if en.get("cooldown", 0) > 0:
         en["cooldown"] -= 1
-        dx, dy = en["dir"]
-        cand = (px + dx, py + dy)
-        if cell_blocked_for_enemy(layout, occupied, cand):
-            en["dir"] = (-dx, -dy)
-            cand = (px - dx, py - dy)
-            if cell_blocked_for_enemy(layout, occupied, cand):
-                return None
-        en["pos"] = cand
-        return cand
-    # Adjacent mirror (or underfoot): flip it, then back off.
+        # wander AWAY from the last flipped mirror
+        options = []
+        if last is not None:
+            if px != last[0]:
+                options.append((1 if px > last[0] else -1, 0))
+            if py != last[1]:
+                options.append((0, 1 if py > last[1] else -1))
+        if not options:
+            options = [rng.choice(DIR4)]
+        if len(options) > 1 and rng.random() < 0.5:
+            options = options[::-1]
+        for dx, dy in options:
+            cand = (px + dx, py + dy)
+            if not cell_blocked_for_enemy(layout, occupied, cand):
+                en["pos"] = cand
+                return cand
+        return None
+    # Flip an adjacent mirror - but never the one we just flipped (unless
+    # it is the only mirror on the node).
     for dx, dy in DIR4:
-        if (px + dx, py + dy) in mirrors:
-            mirrors[(px + dx, py + dy)] = (
-                "/" if mirrors[(px + dx, py + dy)] == "\\" else "\\"
-            )
+        spot = (px + dx, py + dy)
+        if spot in mirrors and (spot != last or len(mirrors) == 1):
+            mirrors[spot] = "/" if mirrors[spot] == "\\" else "\\"
+            en["last_target"] = spot
             en["cooldown"] = 4
             en["dir"] = rng.choice(DIR4)
             return None
     if not mirrors:
         return None
-    # Close on the nearest mirror (greedy; ties broken by distance then x, y).
+    # Seek the nearest mirror excluding the last target.
+    candidates = [m for m in mirrors if m != last] or list(mirrors)
     target = min(
-        mirrors,
+        candidates,
         key=lambda m: (abs(m[0] - px) + abs(m[1] - py), m[0], m[1]),
     )
+    en["last_target"] = target
+    options = []
+    if target[0] != px:
+        options.append(((1 if target[0] > px else -1), 0))
+    if target[1] != py:
+        options.append((0, (1 if target[1] > py else -1)))
+    options.sort(key=lambda d: -(abs(target[0] - (px + d[0])) + abs(target[1] - (py + d[1]))))
+    for dx, dy in options:
+        cand = (px + dx, py + dy)
+        if not cell_blocked_for_enemy(layout, occupied, cand):
+            en["pos"] = cand
+            return cand
+    return None
     options = []
     if target[0] != px:
         options.append(((1 if target[0] > px else -1), 0))

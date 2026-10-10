@@ -67,3 +67,17 @@ def test_shards_total(tmp_env):
     data = save_mod.default_save()
     data["shards"] = {"1": [0, 1], "2": [0, 1, 2]}
     assert save_mod.shards_total(data) == 5
+
+
+def test_settings_round_trip(tmp_env):
+    from qgrid.lore import DEFAULT_SETTINGS, cycle_setting
+
+    data = save_mod.default_save()
+    assert data["settings"] == DEFAULT_SETTINGS
+    cycle_setting(data["settings"], "sound")  # full -> music
+    data["settings"]["shake"] = "off"
+    save_mod.store("nyx", data)
+    loaded = save_mod.load("nyx")
+    assert loaded["settings"]["sound"] == "music"
+    assert loaded["settings"]["shake"] == "off"
+    assert loaded["settings"]["flashes"] == "on"  # untouched default

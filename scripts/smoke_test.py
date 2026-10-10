@@ -55,13 +55,19 @@ class Client:
     async def read_until(self, *needles: str, timeout: float = 6.0) -> str:
         """Read until a needle appears in NEW output; returns stripped delta."""
         start_len = len(self.buf)
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
 
         async def _pump():
-            while True:
+            # absolute deadline: the game streams animated frames (typewriter
+            # cutscenes, fx loop), so per-read timeouts never fire
+            while loop.time() < deadline:
                 delta = strip_ansi(self.buf[start_len:])
                 if any(n in delta for n in needles):
                     return
-                chunk = await asyncio.wait_for(self.stdout.read(4096), timeout)
+                chunk = await asyncio.wait_for(
+                    self.stdout.read(4096), max(0.05, deadline - loop.time())
+                )
                 if not chunk:
                     return
                 self.buf += chunk
@@ -122,6 +128,8 @@ async def main() -> int:
 
             await c.read_until("JACK IN")
             c.send(" ")
+            await c.read_until("PROLOGUE")
+            c.send("x")  # skip the opening cutscene
             await c.read_until("SECTOR ACCESS")
             print("connected; menus verified", flush=True)
 
@@ -131,7 +139,7 @@ async def main() -> int:
             c.send("q")
 
             c.send("\r")  # ENTER on sector select -> node select (sector 1)
-            await c.read_until("Press 1-8")
+            await c.read_until("1-8: node")
             c.send("\r")  # ENTER -> first uncleared node (NODE 01)
             await c.read_until("PRESS ANY KEY TO ENGAGE")
             c.send(" ")
@@ -141,7 +149,7 @@ async def main() -> int:
             print("NODE 01 - FIRST LIGHT: cleared via SSH", flush=True)
 
             c.send(" ")  # dismiss complete -> node select
-            await c.read_until("Press 1-8")
+            await c.read_until("1-8: node")
             c.send("q")  # q disconnects from anywhere
             await c.read_until("CONNECTION TERMINATED", timeout=5)
             print("clean disconnect verified", flush=True)

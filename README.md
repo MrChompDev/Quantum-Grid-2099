@@ -2,8 +2,10 @@
 
 A cyberpunk laser-reflection puzzle game played entirely over SSH — now with
 live ICE daemons, splitter prisms, teleport arrays, datashards, persistent
-saves, a 16-entry codex, two endings, an 8-bit chiptune engine and a
-pixel-doubled playfield.
+saves, a 16-entry codex, typewriter cutscenes, two endings, a settings
+system, an 8-bit chiptune engine and a pixel-doubled playfield. Every one of the 48 nodes is
+BFS-verified solvable AND beatable with live ICE by an adaptive bot
+(`scripts/audit_levels.py`).
 
 You are **NYX**: a netrunner with a light-beam probe and a brother the Grid
 erased. Descend through **6 sectors and 48 nodes** of OMNICORP's Quantum
@@ -83,6 +85,7 @@ par (optimal action count) after extraction.
 | `R` | Rotate an adjacent (or underfoot) mirror |
 | `K` | Restart the current node (restores entry bandwidth) |
 | `M` | Cycle sound mode: full → music → SFX → off |
+| `O` | Settings screen (from sector / node select) |
 | `C` | Open the codex (from sector / node select) |
 | `1`–`6` | Pick a sector |
 | `1`–`8` | Pick a node within a sector |
@@ -114,6 +117,22 @@ audible bell muted — either use the companion client, or enable the
 "audible bell" setting in your terminal. Servers can run with
 `QG_BELL=off` to mute the bell when using the companion (avoids
 double-beeps).
+
+### Story & cutscenes
+
+The campaign opens with a **prologue cutscene** (rain-soaked Sector 7, the debt, MIRAGE's call), each sector ends with a **dialogue cutscene** advancing the plot - NYX, MIRAGE, DIRECTOR VEX and ORACLE-9 trade words as you descend - and the finale plays one of **two ending cutscenes** before the victory screen. Pages type out character by character; any key reveals the page, ENTER advances, X skips the scene.
+
+### Settings
+
+Press `O` on the sector or node screen. Settings persist per-runner in your save and apply instantly:
+
+| Setting | Values |
+| --- | --- |
+| SOUND | full / music / sfx / off (same as `M`) |
+| SCREEN SHAKE | on / off (accessibility) |
+| FLASH EFFECTS | on / off (accessibility) |
+| BEAM SHIMMER | on / off |
+| TEXT SPEED | normal / fast / instant (cutscenes) |
 
 ### 8-bit chiptune engine
 
@@ -160,7 +179,7 @@ terminal bell — pitch-programmed square-wave tones (`CSI 10;Hz` + BEL):
 | `◆` | Datashard | KAI's memory fragments: score + codex + endings |
 | `✖` | SENTINEL ICE | patrols an axis, bounces off obstacles |
 | `☠` | HUNTER ICE | chases within 6 cells, moves every other tick |
-| `Ψ` | CORRUPTOR ICE | flips a nearby mirror, then backs off |
+| `Ψ` | CORRUPTOR ICE | flips a nearby mirror, then backs off and shifts targets - no mirror stays pinned |
 | `▓` | Wall | blocks beams, movement and daemons |
 | `Ω` | Extraction node | step here with all receptors powered to win |
 
@@ -220,6 +239,7 @@ qgrid/
   game.py          game state, turns, ICE strikes, shards, teleports, scoring
   audio.py         8-bit chiptune engine (bell tones, songs, SFX, modes)
   audio_client.py  companion player: PTY bridge + local square-wave synth
+  bot.py           adaptive live-ICE playthrough bot (re-planning agent)
   render.py        adaptive full-terminal ANSI frames, 2x2 upscaling, VFX
   save.py          per-username JSON persistence
   server.py        asyncssh server, session state machine, raw input handling
@@ -248,7 +268,8 @@ scripts/
 ## Testing
 
 ```bash
-python -m pytest tests/ -q          # unit + solver + live-ICE bot + campaign
+python -m pytest tests/ -q          # unit + solver + all-48 live-ICE bot + campaign
+python scripts/audit_levels.py      # full audit: solvable, pars, shards, ICE bot
 python scripts/smoke_test.py        # end-to-end over real SSH (port 2299)
 python scripts/full_playthrough.py  # full 48-node campaign over real SSH
 python scripts/generate_levels.py   # regenerate level data (seed 2099)
