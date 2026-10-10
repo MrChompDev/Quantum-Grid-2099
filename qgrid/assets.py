@@ -19,6 +19,19 @@ FLOOR_GLYPH = "\u00b7"  # empty floor (middle dot)
 
 MIRROR_GLYPHS = ("/", "\\")
 
+SPLITTER_GLYPH = "\u25c7"  # splitter prism (diamond)
+PAD_GLYPHS = {"T": "\u00bb", "U": "\u00ab"}  # teleport pads (linked pair)
+SHARD_GLYPH = "\u25c6"  # datashard (memory fragment of KAI)
+
+SENTINEL_GLYPH = "\u2716"  # patrol daemon
+HUNTER_GLYPH = "\u2620"  # pursuit daemon
+CORRUPTOR_GLYPH = "\u03a8"  # sabotage daemon
+ENEMY_GLYPHS = {
+    "sentinel": SENTINEL_GLYPH,
+    "hunter": HUNTER_GLYPH,
+    "corruptor": CORRUPTOR_GLYPH,
+}
+
 BEAM_H = "\u2500"  # horizontal beam
 BEAM_V = "\u2502"  # vertical beam
 BEAM_X = "\u253c"  # crossing
@@ -44,6 +57,18 @@ _BANNER_FONT: dict[str, tuple[str, str, str, str, str]] = {
     "B": ("████.", "█...█", "████.", "█...█", "████."),
     "E": ("█████", "█....", "████.", "█....", "█████"),
     "S": (".████", "█....", ".███.", "....█", "████."),
+    "C": (".████", "█....", "█....", "█....", ".████"),
+    "F": ("█████", "█....", "████.", "█....", "█...."),
+    "H": ("█...█", "█...█", "█████", "█...█", "█...█"),
+    "K": ("█...█", "█..█.", "███..", "█..█.", "█...█"),
+    "O": (".███.", "█...█", "█...█", "█...█", ".███."),
+    "P": ("████.", "█...█", "████.", "█....", "█...."),
+    "V": ("█...█", "█...█", "█...█", ".█.█.", "..█.."),
+    "W": ("█...█", "█...█", "█.█.█", "██.██", "█...█"),
+    "X": ("█...█", ".█.█.", "..█..", ".█.█.", "█...█"),
+    "Y": ("█...█", ".█.█.", "..█..", "..█..", "..█.."),
+    "Z": ("█████", "...█.", "..█..", ".█...", "█████"),
+    "1": ("..█..", ".██..", "..█..", "..█..", "█████"),
     "2": (".███.", "█...█", "..██.", ".█...", "█████"),
     "0": (".███.", "█...█", "█.███", "█...█", ".███."),
     "9": ("████.", "█...█", "████.", "...█.", ".███."),
@@ -65,14 +90,16 @@ def banner(text: str) -> list[str]:
 
 # Laser-diagram legend strip: entities with their glyphs.
 LEGEND_ROW = (
-    f"{EMITTER_GLYPHS['>']} {BEAM_H}{BEAM_H}{BEAM_H} {RECEPTOR_GLYPH}"
-    f"      {MIRROR_GLYPHS[0]} {MIRROR_GLYPHS[1]}"
-    f"      {WALL_GLYPH}{WALL_GLYPH}{WALL_GLYPH}"
-    f"      {PLAYER_GLYPH}"
-    f"      {EXIT_GLYPH}"
+    f"{EMITTER_GLYPHS['>']} {BEAM_H * 3} {RECEPTOR_GLYPH}"
+    f"   {MIRROR_GLYPHS[0]} {MIRROR_GLYPHS[1]} {SPLITTER_GLYPH}"
+    f"   {PAD_GLYPHS['T']}{PAD_GLYPHS['U']} {SHARD_GLYPH}"
+    f"   {WALL_GLYPH * 3}"
+    f"   {PLAYER_GLYPH} {EXIT_GLYPH}"
 )
 
-LEGEND_LABELS = "EMITTER          MIRRORS    WALL     PROBE   EXIT"
+LEGEND_LABELS = (
+    "EMITTER     MIRRORS PRISM  PADS SHARD   WALL     PROBE EXIT"
+)
 
 # Decorative circuit motif for the title screen.
 TITLE_MOTIF = [

@@ -1,9 +1,15 @@
 """BFS solver for Quantum Grid 2099.
 
 Explores (player, mirror-state) space to verify level solvability and
-compute optimal action counts. The beam trace is only evaluated for
+compute optimal action counts. Teleport pads add both the stepped cell
+and its linked destination as zero-extra-cost successors of the same
+move. The beam trace (including splitter prisms) is only evaluated for
 states where the player stands on the extraction node (the win
 condition), keeping the search fast even on the biggest grids.
+
+ICE daemons are intentionally NOT modeled: they are action-economy
+hazards, not puzzle state. A level is "solvable" if the laser puzzle
+admits a solution.
 """
 
 from collections import deque
@@ -19,6 +25,7 @@ def solve_level(layout) -> Action | None:
     """BFS for the shortest action sequence that powers all receptors and
     steps onto the extraction node. Returns the action path or None."""
     receptors = set(layout.receptors)
+    pads = layout.pads
     start = (layout.player_start, frozenset(layout.mirrors.items()))
     queue: deque[tuple[tuple[tuple[int, int], frozenset], tuple]] = deque([(start, ())])
     visited = {start}
@@ -39,6 +46,12 @@ def solve_level(layout) -> Action | None:
             if state not in visited:
                 visited.add(state)
                 queue.append((state, path + (("m", dx, dy),)))
+            if nxt in pads:
+                dest = pads[nxt]
+                state = (dest, mirrors_fs)
+                if state not in visited:
+                    visited.add(state)
+                    queue.append((state, path + (("m", dx, dy),)))
         mirrors = dict(mirrors_fs)
         target = player if player in mirrors else None
         if target is None:

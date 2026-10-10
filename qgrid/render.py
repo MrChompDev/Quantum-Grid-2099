@@ -1,14 +1,15 @@
-"""ANSI rendering engine for Quantum Grid 2099.
+"""ANSI rendering engine for Quantum Grid 2099: BLACKOUT PROTOCOL.
 
-Cyber-blue theme: blue probe on black, green laser fire, red emitters.
-Renders adaptive terminal frames (minimum 80x24) using ANSI escape
-sequences. Every frame is drawn with a cursor-home redraw (\\033[H) plus
-clear-to-end-of-line (\\033[K) per row to avoid flicker; full clears
-(\\033[2J) are used only on screen transitions.
+Cyber-blue theme: blue probe on black, green laser fire, red emitters,
+magenta ICE. Renders adaptive terminal frames (minimum 80x24) using
+ANSI escape sequences. Every frame is drawn with a cursor-home redraw
+(\\033[H) plus clear-to-end-of-line (\\033[K) per row to avoid flicker;
+full clears (\\033[2J) are used only on screen transitions.
 """
 
 from . import assets
-from .levels import EMITTER_CHARS, EXIT, WALL, LevelDef
+from .levels import EMITTER_CHARS, EXIT, LevelDef, SHARD, SPLITTER, WALL
+from .lore import CODEX, GHOST_TRANSMISSIONS, ZONES, rank_for
 
 ESC = "\x1b"
 ESC_K = f"{ESC}[K"
@@ -23,7 +24,7 @@ MIN_H = 24
 # ANSI SGR codes - cyber blue theme -------------------------------------------
 PLAYER_BLUE_ON_BLACK = "1;34;40"  # the probe: blue on black
 BEAM_GREEN = "1;32"  # laser fire: green
-EMITTER_RED = "1;31"  # enemies: red
+EMITTER_RED = "1;31"  # emitters: red
 RECEPTOR_YELLOW = "33"  # unpowered target
 RECEPTOR_YELLOW_HI = "1;33"  # powered target
 MIRROR_CYAN = "1;36"  # optical mirrors
@@ -33,10 +34,17 @@ EXIT_LOCKED = "90"  # dim
 FLOOR_GRAY = "90"  # dark gray on black
 CYAN = "1;36"
 YELLOW = "1;33"
+SHARD_YELLOW = "93"  # datashards
 RED = "1;31"
 WHITE = "37"
 GRAY = "90"
 BLUE = "34"
+ICE_MAGENTA = "1;35"  # ICE daemons
+PAD_MAGENTA = "95"  # teleport pads
+GREEN = "1;32"
+
+ZONE_SIZE = 8
+ZONE_COUNT = 6
 
 
 def _c(code: str, ch: str) -> str:
@@ -86,15 +94,24 @@ def _wrap_center(text: str, width: int, color: str | None = None) -> list[str]:
 def _cell_str(game, x: int, y: int) -> str:
     layout = game.layout
     pos = (x, y)
-    raw = layout.rows[y][x]
     if pos == game.player:
         return _c(PLAYER_BLUE_ON_BLACK, assets.PLAYER_GLYPH)
+    for en in game.daemons:
+        if en["pos"] == pos:
+            return _c(ICE_MAGENTA, assets.ENEMY_GLYPHS[en["kind"]])
     if pos in game.mirrors:
         return _c(MIRROR_CYAN, game.mirrors[pos])
+    raw = layout.rows[y][x]
     if raw == WALL:
         return _c(WALL_BLUE, assets.WALL_GLYPH)
     if raw in EMITTER_CHARS:
         return _c(EMITTER_RED, assets.EMITTER_GLYPHS.get(raw, raw))
+    if raw == SPLITTER:
+        return _c(MIRROR_CYAN, assets.SPLITTER_GLYPH)
+    if raw in ("T", "U"):
+        return _c(PAD_MAGENTA, assets.PAD_GLYPHS.get(raw, raw))
+    if raw == SHARD and pos not in game.shards_taken:
+        return _c(SHARD_YELLOW, assets.SHARD_GLYPH)
     if raw == "*":
         if pos in game.trace.powered:
             return _c(RECEPTOR_YELLOW_HI, assets.RECEPTOR_GLYPH)
@@ -125,21 +142,30 @@ def _bandwidth_bar(bandwidth: int) -> str:
     return _c(color, "\u2588" * filled) + _c(GRAY, "\u2591" * (20 - filled))
 
 
-def _header_lines(game) -> list[str]:
-    node = f"{game.level_index + 1:02d}"
-    title = _c(CYAN, f"  QUANTUM GRID 2099 // MAINFRAME NODE {node}") + _c(
+def _header_lines(game, total_score: int = 0) -> list[str]:
+    zone = game.defn.zone
+    title = _c(CYAN, f"  QUANTUM GRID 2099 // NODE {game.level_index + 1:02d}") + _c(
         GRAY, f" - {game.defn.name}"
-    )
+    ) + _c(GRAY, f"  [SECTOR {zone:02d}]")
     powered = len(game.trace.powered)
     total = len(game.layout.receptors)
     if game.all_powered():
         state = _c(BEAM_GREEN, "[UNLOCKED]")
     else:
         state = _c(RED, "[LOCKED]")
+    shards = len(game.shards_taken)
+    shards_total = len(game.layout.shards)
     line = (
-        f"  BANDWIDTH: [{_bandwidth_bar(game.bandwidth)}] {_c(WHITE, str(game.bandwidth))}%"
-        f" {_c(GRAY, '|')} RECEPTORS: {_c(WHITE, f'{powered}/{total}')} {state}"
+        f"  BW [{_bandwidth_bar(game.bandwidth)}] {_c(WHITE, str(game.bandwidth))}%"
+        f" {_c(GRAY, '|')} REC {_c(WHITE, f'{powered}/{total}')} {state}"
     )
+    if shards_total:
+        line += (
+            f" {_c(GRAY, '|')} {_c(SHARD_YELLOW, assets.SHARD_GLYPH)}"
+            f" {_c(WHITE, f'{shards}/{shards_total}')}"
+        )
+    if total_score:
+        line += f" {_c(GRAY, '|')} {_c(YELLOW, f'{total_score} PTS')}"
     return [title, line]
 
 
@@ -165,7 +191,7 @@ def _emit(lines: list[str], width: int, height: int, home: str) -> str:
     return "".join(out)
 
 
-def render_frame(game, width: int = MIN_W, height: int = MIN_H) -> str:
+def render_frame(game, width: int = MIN_W, height: int = MIN_H, total_score: int = 0) -> str:
     """Build the gameplay frame filling the terminal, grid centered."""
     width = max(width, MIN_W)
     height = max(height, MIN_H)
@@ -179,7 +205,7 @@ def render_frame(game, width: int = MIN_W, height: int = MIN_H) -> str:
     pad_below = max(0, middle - grid_h - pad_above)
 
     lines: list[str] = [_rule(width)]
-    lines.extend(_header_lines(game))
+    lines.extend(_header_lines(game, total_score))
     lines.append(_rule(width))
     lines.extend([""] * pad_above)
     for y in range(game.layout.height):
@@ -215,81 +241,256 @@ def _colored_banner(text: str, color: str) -> list[str]:
 
 
 def render_title(width: int = MIN_W, height: int = MIN_H) -> str:
-    from .levels import TITLE_LORE
-
-    # fits exactly 24 rows on a standard terminal
     body = [
         *_indent(_colored_banner("QUANTUM GRID", CYAN)),
         *_indent(_colored_banner("2099", EMITTER_RED)),
         "",
-        *_wrap_center(TITLE_LORE, width),
+        *_wrap_center("B L A C K O U T   P R O T O C O L", width, color=GRAY),
+        "",
+        *_wrap_center(
+            "48 nodes. 6 sectors. Live ICE. One erased brother.", width, color=WHITE
+        ),
         "",
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
         _center(
-            "Rotate optical mirrors, redirect laser fire, power the receptors.", width
+            "Rotate mirrors, split beams, fold space, dodge the daemons.", width
         ),
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO JACK IN <<<"), width),
     ]
     return _screen(body, width, height)
 
 
-def _node_label(i: int, unlocked: int, unlock_all: bool) -> str:
-    from .levels import LEVELS
-
-    if unlock_all or i <= unlocked:
-        return _c(WHITE, f"[{i + 1}] NODE {i + 1:02d}") + _c(
-            CYAN, f" - {LEVELS[i].name}"
-        )
-    return _c(GRAY, f"[{i + 1}] NODE {i + 1:02d} - {LEVELS[i].name}") + _c(
-        RED, " [LOCKED]"
-    )
-
-
-def render_level_select(
-    unlocked: int, unlock_all: bool = False, width: int = MIN_W, height: int = MIN_H
+def render_save_menu(
+    save: dict, username: str, width: int = MIN_W, height: int = MIN_H
 ) -> str:
-    from .levels import LEVELS
-
+    nodes = save.get("unlocked", 0)
+    has_progress = nodes > 0 or save.get("total_score", 0) > 0
     body = [
-        _center(_c(CYAN, "MAINFRAME NODE ACCESS"), width),
+        _center(_c(CYAN, f"NETRUNNER ID: {username}"), width),
         "",
     ]
-    half = (len(LEVELS) + 1) // 2
-    for i in range(half):
-        left = _node_label(i, unlocked, unlock_all)
-        right = ""
-        if i + half < len(LEVELS):
-            right = _node_label(i + half, unlocked, unlock_all)
-        pad = 36 - len(_strip_ansi(left))
-        body.append("  " + left + " " * max(1, pad) + right)
+    if has_progress:
+        body.extend(
+            [
+                _center(
+                    f"PROGRESS: {_c(WHITE, str(nodes) + '/48')} nodes"
+                    f" {_c(GRAY, '|')} SCORE {_c(YELLOW, str(save.get('total_score', 0)))}"
+                    f" {_c(GRAY, '|')} CODEX {_c(CYAN, str(len(save.get('codex', []))) + '/16')}",
+                    width,
+                ),
+                "",
+                _center(_c(BEAM_GREEN, "[ENTER] CONTINUE RUN"), width),
+                _center(_c(WHITE, "[N] NEW RUN (resets progress)"), width),
+                "",
+                _center(_c(GRAY, "Shards banked survive a new run? No. The Grid"), width),
+                _center(_c(GRAY, "keeps nothing it is not forced to keep."), width),
+            ]
+        )
+    else:
+        body.extend(
+            [
+                *_wrap_center(
+                    "First descent detected. NYX, your channel is clean and your "
+                    "debt is due. MIRAGE is waiting on the wire.",
+                    width,
+                    color=GRAY,
+                ),
+                "",
+                _center(_c(BEAM_GREEN, "[ENTER] BEGIN RUN"), width),
+            ]
+        )
+    return _screen(body, width, height)
+
+
+def _zone_status(zone_num: int, save: dict, unlock_all: bool) -> str:
+    start = (zone_num - 1) * ZONE_SIZE
+    cleared_end = min(save.get("unlocked", 0), zone_num * ZONE_SIZE - 1)
+    cleared = max(0, cleared_end - start + 1) if save.get("unlocked", 0) >= start else 0
+    if unlock_all or save.get("unlocked", 0) >= start:
+        if cleared >= ZONE_SIZE:
+            return _c(BEAM_GREEN, f"CLEARED {cleared}/{ZONE_SIZE}")
+        return _c(YELLOW, f"IN PROGRESS {cleared}/{ZONE_SIZE}")
+    return _c(RED, "[LOCKED]")
+
+
+def render_zone_select(
+    save: dict, unlock_all: bool = False, width: int = MIN_W, height: int = MIN_H
+) -> str:
+    body = [
+        _center(_c(CYAN, "SECTOR ACCESS // QUANTUM GRID 2099"), width),
+        "",
+    ]
+    for zone in ZONES:
+        num = zone.number
+        label = _c(WHITE, f"[{num}] SECTOR {num:02d}") + _c(CYAN, f" - {zone.name}")
+        status = _zone_status(num, save, unlock_all)
+        pad = 34 - len(_strip_ansi(label))
+        line = "  " + label + " " * max(1, pad) + status
+        body.append(line)
+        body.append(_center(_c(GRAY, zone.tagline), width))
     body.extend(
         [
             "",
-            f"  Press 1-{len(LEVELS)} to jack in | ENTER for next node | Q to disconnect",
+            "  Press 1-6 to enter a sector | ENTER: next node | C: codex | Q: disconnect",
         ]
     )
     return _screen(body, width, height)
 
 
-def render_level_intro(
-    defn: LevelDef, bandwidth: int, width: int = MIN_W, height: int = MIN_H
-) -> str:
+def _node_line(i: int, save: dict, unlock_all: bool) -> str:
+    from .levels import LEVELS
+
+    defn = LEVELS[i]
+    in_zone = i // ZONE_SIZE + 1
+    zone_unlocked = unlock_all or save.get("unlocked", 0) >= (in_zone - 1) * ZONE_SIZE
+    unlocked = zone_unlocked and (unlock_all or i <= save.get("unlocked", 0))
+    cleared = i < save.get("unlocked", 0)
+    label = f"[{i % ZONE_SIZE + 1}] NODE {i + 1:02d} - {defn.name}"
+    if not unlocked:
+        return _c(GRAY, label) + _c(RED, " [LOCKED]")
+    line = _c(WHITE, f"[{i % ZONE_SIZE + 1}]") + _c(CYAN, f" NODE {i + 1:02d} - {defn.name}")
+    if cleared:
+        line += _c(BEAM_GREEN, " \u2713")
+    shard_note = ""
+    layout_shards = _shard_count(i)
+    if layout_shards:
+        got = len(save.get("shards", {}).get(str(i), []))
+        mark = assets.SHARD_GLYPH
+        shard_note = f" {mark}{got}/{layout_shards}"
+        line += _c(SHARD_YELLOW if got == layout_shards else GRAY, shard_note)
+    return line
+
+
+def _shard_count(i: int) -> int:
     from .levels import LEVELS, parse_level
 
+    try:
+        return len(parse_level(LEVELS[i].rows, LEVELS[i].name).shards)
+    except ValueError:
+        return 0
+
+
+def render_node_select(
+    zone_num: int,
+    save: dict,
+    unlock_all: bool = False,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    from .levels import LEVELS
+
+    zone = ZONES[zone_num - 1]
+    body = [
+        _center(
+            _c(CYAN, f"SECTOR {zone_num:02d}") + _c(GRAY, " // ") + _c(WHITE, zone.name),
+            width,
+        ),
+        _center(_c(GRAY, zone.tagline), width),
+        "",
+    ]
+    start = (zone_num - 1) * ZONE_SIZE
+    for r in range(ZONE_SIZE // 2):
+        left = _node_line(start + r, save, unlock_all)
+        right = _node_line(start + r + ZONE_SIZE // 2, save, unlock_all)
+        pad = 38 - len(_strip_ansi(left))
+        body.append("  " + left + " " * max(1, pad) + right)
+    body.extend(
+        [
+            "",
+            "  Press 1-8 to jack in | ENTER: next uncleared node | Q: back to sectors",
+        ]
+    )
+    return _screen(body, width, height)
+
+
+def render_codex(
+    save: dict,
+    selected: int = 0,
+    detail: bool = False,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    unlocked = set(save.get("codex", []))
+    body = [
+        _center(
+            _c(CYAN, "CODEX")
+            + _c(GRAY, " // ")
+            + _c(WHITE, f"{len(unlocked)}/{len(CODEX)} ENTRIES DECRYPTED"),
+            width,
+        ),
+        "",
+    ]
+    half = (len(CODEX) + 1) // 2
+    for r in range(half):
+        cols = []
+        for idx in (r, r + half):
+            if idx >= len(CODEX):
+                cols.append("")
+                continue
+            key, title, _ = CODEX[idx]
+            if key in unlocked:
+                mark = _c(BEAM_GREEN, "[+]")
+                cols.append(f"{mark} {_c(WHITE, title)}")
+            else:
+                cols.append(f"{_c(GRAY, '[?]')} {_c(GRAY, '?' * len(title))}")
+        pad = 38 - len(_strip_ansi(cols[0]))
+        body.append("  " + cols[0] + " " * max(1, pad) + cols[1])
+    if detail and CODEX[selected][0] in unlocked:
+        key, title, text = CODEX[selected]
+        body.append("")
+        body.append(_center(_c(YELLOW, f"// {title}"), width))
+        body.extend(_wrap_center(text, width, color=GRAY))
+    elif detail:
+        body.append("")
+        body.append(_center(_c(RED, "SIGNAL ENCRYPTED - entry not yet decrypted"), width))
+    body.extend(
+        [
+            "",
+            "  W/S: select | ENTER: read | C/Q: back",
+        ]
+    )
+    return _screen(body, width, height)
+
+
+def _threat_summary(defn: LevelDef) -> str:
+    from .levels import parse_level
+
     layout = parse_level(defn.rows, defn.name)
-    node = LEVELS.index(defn) + 1
+    counts: dict[str, int] = {}
+    for _, kind in layout.enemies:
+        counts[kind] = counts.get(kind, 0) + 1
+    names = {
+        "sentinel": "SENTINEL",
+        "hunter": "HUNTER",
+        "corruptor": "CORRUPTOR",
+    }
+    parts = [f"{count}x {names[kind]}" for kind, count in sorted(counts.items())]
+    return ", ".join(parts) if parts else "none detected"
+
+
+def render_level_intro(
+    defn: LevelDef, node_index: int, bandwidth: int, width: int = MIN_W, height: int = MIN_H
+) -> str:
+    from .levels import parse_level
+
+    layout = parse_level(defn.rows, defn.name)
+    zone = ZONES[defn.zone - 1]
     body = [
         "",
         _center(_c(EMITTER_RED, "NEW NODE DETECTED"), width),
         "",
-        _center(_c(CYAN, f"NODE {node:02d} - {defn.name}"), width),
+        _center(_c(CYAN, f"NODE {node_index + 1:02d} - {defn.name}"), width),
+        _center(_c(GRAY, f"sector {defn.zone:02d} - {zone.name}"), width),
         _center(
             _c(
                 GRAY,
                 f"grid {layout.width}x{layout.height}"
-                f" | {len(layout.mirrors)} mirrors | {len(layout.receptors)} receptors",
+                f" | {len(layout.mirrors)} mirrors"
+                + (f" | {len(layout.splitters)} prisms" if layout.splitters else "")
+                + (f" | {len(layout.pads) // 2} pad pair" if layout.pads else "")
+                + f" | {len(layout.receptors)} receptors",
             ),
             width,
         ),
@@ -299,8 +500,15 @@ def render_level_intro(
         _center(_c(WHITE, f"OBJECTIVE: {_truncate(defn.intro, width - 16)}"), width),
         "",
         _center(
+            _c(ICE_MAGENTA, f"ICE: {_threat_summary(defn)}")
+            + _c(GRAY, " | ")
+            + _c(SHARD_YELLOW, f"SHARDS: {len(layout.shards)}"),
+            width,
+        ),
+        "",
+        _center(
             f"BANDWIDTH: {_c(BEAM_GREEN, str(bandwidth))}%"
-            f"  {_c(GRAY, '|')}  1% consumed per action",
+            f"  {_c(GRAY, '|')}  1% per action, 25% per ICE strike",
             width,
         ),
         "",
@@ -310,10 +518,11 @@ def render_level_intro(
 
 
 def render_level_complete(
-    game, next_index: int, width: int = MIN_W, height: int = MIN_H
+    game, next_index: int, session_score: int, width: int = MIN_W, height: int = MIN_H
 ) -> str:
     from .levels import LEVELS
 
+    par = game.defn.par or game.actions
     body = [
         "",
         _center(_c(BEAM_GREEN, "*** ACCESS GRANTED ***"), width),
@@ -324,10 +533,24 @@ def render_level_complete(
             width,
         ),
         "",
+        _center(
+            f"ACTIONS {game.actions}"
+            f" {_c(GRAY, '(par ' + str(par) + ')')}"
+            f" {_c(GRAY, '|')} SHARDS {_c(SHARD_YELLOW, str(len(game.shards_taken)))}"
+            f" {_c(GRAY, '|')} STRIKES {_c(RED, str(game.strikes))}",
+            width,
+        ),
+        _center(
+            _c(YELLOW, f"+{game.score()} SCORE")
+            + _c(GRAY, " | ")
+            + _c(WHITE, f"RUN TOTAL {session_score}"),
+            width,
+        ),
+        "",
         _center(_c(BEAM_GREEN, "BANDWIDTH REFRESHED TO 100%"), width),
         "",
         _center(
-            f"Descend to NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width
+            f"Next: NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width
         ),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO CONTINUE <<<"), width),
@@ -349,24 +572,49 @@ def render_game_over(game, width: int = MIN_W, height: int = MIN_H) -> str:
         _center(
             f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width
         ),
+        _center(
+            _c(GRAY, "Your progress is saved. The Grid keeps count even when you can't."),
+            width,
+        ),
         "",
-        _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO DISCONNECT <<<"), width),
+        _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO RE-JACK <<<"), width),
     ]
     return _screen(body, width, height)
 
 
-def render_victory(session, width: int = MIN_W, height: int = MIN_H) -> str:
-    from .levels import VICTORY_LORE
+def render_victory(
+    save: dict,
+    total_shards_in_game: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    """Final campaign screen: rank + ending (true if enough shards banked)."""
+    from .lore import SHARDS_FOR_TRUE_ENDING
 
+    banked = sum(len(v) for v in save.get("shards", {}).values())
+    score = save.get("total_score", 0)
+    rank, color = rank_for(score)
+    true_end = total_shards_in_game > 0 and banked >= SHARDS_FOR_TRUE_ENDING * total_shards_in_game
+    ending = TRUE_ENDING_LORE if true_end else STANDARD_ENDING_LORE
     body = [
         "",
         _center(_c(BEAM_GREEN, "*** MAINFRAME COMPROMISED ***"), width),
         "",
         *_indent(_colored_banner("GRID", BEAM_GREEN)),
         "",
-        *_wrap_center(VICTORY_LORE, width),
+        _center(
+            _c(WHITE, "FINAL SCORE ")
+            + _c(YELLOW, str(score))
+            + _c(GRAY, " // ")
+            + _c(color, f"RANK: {rank}"),
+            width,
+        ),
+        _center(
+            _c(SHARD_YELLOW, f"DATASHARDS RECOVERED: {banked}/{total_shards_in_game}"),
+            width,
+        ),
         "",
-        _center(f"Total actions burned: {session.total_actions}", width),
+        *_wrap_center(ending, width, color=GRAY if not true_end else SHARD_YELLOW),
         "",
         *_indent([_c(GRAY, row) for row in assets.VICTORY_MOTIF]),
         "",

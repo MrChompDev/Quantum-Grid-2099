@@ -1,20 +1,24 @@
-"""Level definitions and parsing for Quantum Grid 2099.
+"""Level definitions and parsing for Quantum Grid 2099: BLACKOUT PROTOCOL.
 
 Each level is an ASCII grid of characters (including the border walls).
-Grid size varies per level (bigger nodes later in the campaign):
+Grid size varies per level (bigger nodes deeper in the campaign):
+
     #  mainframe wall (impassable, blocks beams)
     .  empty floor
     @  player probe start position
-    >  laser emitter firing right
-    <  laser emitter firing left
-    ^  laser emitter firing up
-    v  laser emitter firing down
+    >  laser emitter firing right      <  left      ^  up      v  down
     *  target receptor
     /  optical mirror (rotates to backslash and back)
+    +  splitter prism (forks the beam into two perpendicular beams)
+    T  teleport pad A (links to U)     U  teleport pad B (links to T)
+    $  datashard (optional collectible: memory fragment of KAI)
+    S  SENTINEL ICE spawn (patrol daemon)
+    H  HUNTER ICE spawn (pursuit daemon)
+    C  CORRUPTOR ICE spawn (sabotage daemon)
     E  extraction node
 
-The 16 campaign nodes are procedurally generated and BFS-verified; see
-scripts/generate_levels.py and qgrid/level_data.py.
+The 48 campaign nodes across 6 sectors are procedurally generated and
+BFS-verified; see scripts/generate_levels.py and qgrid/level_data.py.
 """
 
 from dataclasses import dataclass, field
@@ -27,19 +31,32 @@ PLAYER = "@"
 RECEPTOR = "*"
 MIRROR_A = "/"
 MIRROR_B = "\\"
+SPLITTER = "+"
+PAD_A = "T"
+PAD_B = "U"
+SHARD = "$"
+ENEMY_SPAWNS = ("S", "H", "C")  # sentinel, hunter, corruptor
 EXIT = "E"
 EMITTER_CHARS = (">", "<", "^", "v")
 
+ENEMY_KIND_BY_CHAR = {"S": "sentinel", "H": "hunter", "C": "corruptor"}
+
 __all__ = [
     "EMITTER_CHARS",
+    "ENEMY_KIND_BY_CHAR",
+    "ENEMY_SPAWNS",
     "EXIT",
     "FLOOR",
     "GAMEOVER_LORE",
     "LEVELS",
     "MIRROR_A",
     "MIRROR_B",
+    "PAD_A",
+    "PAD_B",
     "PLAYER",
     "RECEPTOR",
+    "SHARD",
+    "SPLITTER",
     "TITLE_LORE",
     "VICTORY_LORE",
     "WALL",
@@ -55,6 +72,8 @@ class LevelDef:
     intro: str
     rows: tuple[str, ...]
     lore: str = ""
+    zone: int = 1
+    par: int | None = None
     # Hard-set bandwidth on entry (None = carry over from previous node).
     bandwidth_start: int | None = None
     # Minimum bandwidth on entry (applied after carry-over, capped at 100).
@@ -68,6 +87,10 @@ class LevelLayout:
     rows: tuple[str, ...]
     walls: frozenset[tuple[int, int]] = field(default_factory=frozenset)
     mirrors: dict[tuple[int, int], str] = field(default_factory=dict)
+    splitters: frozenset[tuple[int, int]] = field(default_factory=frozenset)
+    pads: dict[tuple[int, int], tuple[int, int]] = field(default_factory=dict)
+    shards: tuple[tuple[int, int], ...] = ()
+    enemies: tuple[tuple[tuple[int, int], str], ...] = ()
     emitters: tuple[tuple[tuple[int, int], str], ...] = ()
     receptors: tuple[tuple[int, int], ...] = ()
     exit_pos: tuple[int, int] = (0, 0)
@@ -78,6 +101,7 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
     """Parse a level's ASCII rows into a validated LevelLayout.
 
     The grid size is derived from the rows; the border must be intact.
+    Teleport pads must come in exactly one T/U pair.
     """
     height = len(rows)
     if height < 3:
@@ -88,6 +112,11 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
 
     walls: set[tuple[int, int]] = set()
     mirrors: dict[tuple[int, int], str] = {}
+    splitters: set[tuple[int, int]] = set()
+    pads_a: list[tuple[int, int]] = []
+    pads_b: list[tuple[int, int]] = []
+    shards: list[tuple[int, int]] = []
+    enemies: list[tuple[tuple[int, int], str]] = []
     emitters: list[tuple[tuple[int, int], str]] = []
     receptors: list[tuple[int, int]] = []
     exit_pos = None
@@ -106,6 +135,16 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
                 continue
             elif ch in (MIRROR_A, MIRROR_B):
                 mirrors[pos] = ch
+            elif ch == SPLITTER:
+                splitters.add(pos)
+            elif ch == PAD_A:
+                pads_a.append(pos)
+            elif ch == PAD_B:
+                pads_b.append(pos)
+            elif ch == SHARD:
+                shards.append(pos)
+            elif ch in ENEMY_SPAWNS:
+                enemies.append((pos, ENEMY_KIND_BY_CHAR[ch]))
             elif ch in EMITTER_CHARS:
                 emitters.append((pos, ch))
             elif ch == RECEPTOR:
@@ -137,6 +176,15 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
         raise ValueError(f"level '{name}' has no laser emitters")
     if not receptors:
         raise ValueError(f"level '{name}' has no receptors")
+    if len(pads_a) != len(pads_b):
+        raise ValueError(f"level '{name}' has unlinked teleport pads")
+    if len(pads_a) > 1:
+        raise ValueError(f"level '{name}' has more than one teleport pad pair")
+
+    pads: dict[tuple[int, int], tuple[int, int]] = {}
+    if pads_a:
+        pads[pads_a[0]] = pads_b[0]
+        pads[pads_b[0]] = pads_a[0]
 
     return LevelLayout(
         width=width,
@@ -144,6 +192,10 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
         rows=tuple(rows),
         walls=frozenset(walls),
         mirrors=mirrors,
+        splitters=frozenset(splitters),
+        pads=pads,
+        shards=tuple(shards),
+        enemies=tuple(enemies),
         emitters=tuple(emitters),
         receptors=tuple(receptors),
         exit_pos=exit_pos,
@@ -152,3 +204,4 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
 
 
 LEVELS: tuple[LevelDef, ...] = tuple(LevelDef(**d) for d in LEVEL_DATA)
+ZONES: tuple[LevelDef, ...] = tuple(LEVELS)  # 48 nodes, zone via defn.zone
