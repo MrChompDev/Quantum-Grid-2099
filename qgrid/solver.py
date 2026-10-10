@@ -24,46 +24,52 @@ Action = tuple[str, int, int]
 def solve_level(layout) -> Action | None:
     """BFS for the shortest action sequence that powers all receptors and
     steps onto the extraction node. Returns the action path or None."""
+    return solve_state(layout, layout.player_start, dict(layout.mirrors))
+
+
+def solve_state(
+    layout, player: tuple[int, int], mirrors: dict[tuple[int, int], str]
+) -> Action | None:
+    """BFS from an arbitrary (player, mirror) state - used by adaptive
+    playthrough bots that must re-plan around live ICE."""
     receptors = set(layout.receptors)
     pads = layout.pads
-    start = (layout.player_start, frozenset(layout.mirrors.items()))
+    start = (player, frozenset(mirrors.items()))
     queue: deque[tuple[tuple[tuple[int, int], frozenset], tuple]] = deque([(start, ())])
     visited = {start}
     while queue:
-        (player, mirrors_fs), path = queue.popleft()
-        if player == layout.exit_pos:
-            trace = trace_beam(layout, player, dict(mirrors_fs))
+        (pos, mirrors_fs), path = queue.popleft()
+        if pos == layout.exit_pos:
+            trace = trace_beam(layout, pos, dict(mirrors_fs))
             if trace.powered == receptors:
                 return path
         for dx, dy in DIR4:
-            nxt = (player[0] + dx, player[1] + dy)
+            nxt = (pos[0] + dx, pos[1] + dy)
             if not (0 <= nxt[0] < layout.width and 0 <= nxt[1] < layout.height):
                 continue
             terrain = layout.rows[nxt[1]][nxt[0]]
             if terrain == WALL or terrain in EMITTER_CHARS:
                 continue
-            state = (nxt, mirrors_fs)
+            # Teleport pads are wormholes: stepping onto one always leaves
+            # the probe at its twin, matching Game.do_move. The pad cell
+            # itself is never a place the probe can stand.
+            eff = pads.get(nxt, nxt)
+            state = (eff, mirrors_fs)
             if state not in visited:
                 visited.add(state)
                 queue.append((state, path + (("m", dx, dy),)))
-            if nxt in pads:
-                dest = pads[nxt]
-                state = (dest, mirrors_fs)
-                if state not in visited:
-                    visited.add(state)
-                    queue.append((state, path + (("m", dx, dy),)))
-        mirrors = dict(mirrors_fs)
-        target = player if player in mirrors else None
+        mirror_map = dict(mirrors_fs)
+        target = pos if pos in mirror_map else None
         if target is None:
             for dx, dy in DIR4:
-                cand = (player[0] + dx, player[1] + dy)
-                if cand in mirrors:
+                cand = (pos[0] + dx, pos[1] + dy)
+                if cand in mirror_map:
                     target = cand
                     break
         if target is not None:
             new_mirrors = dict(mirrors_fs)
             new_mirrors[target] = "/" if new_mirrors[target] == "\\" else "\\"
-            state = (player, frozenset(new_mirrors.items()))
+            state = (pos, frozenset(new_mirrors.items()))
             if state not in visited:
                 visited.add(state)
                 queue.append((state, path + (("r", 0, 0),)))

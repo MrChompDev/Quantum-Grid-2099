@@ -5,18 +5,23 @@ daemon exactly one step. Daemons are light-transparent and cannot stand
 on walls, emitters, teleport pads, the extraction node, or each other.
 
     SENTINEL   patrols a fixed axis, bouncing when blocked.
-    HUNTER     chases the probe within 7 cells (greedy step), else wanders.
-    CORRUPTOR  walks to the nearest mirror and flips it while adjacent.
+    HUNTER     chases the probe within 6 cells (greedy step) at HALF SPEED
+               (acts every other tick), else wanders.
+    CORRUPTOR  walks to the nearest mirror, flips it, then backs off for
+               a few ticks (cooldown) so runners can restore optics.
 
 Probe contact (player steps onto a daemon, or a daemon steps onto the
-player) triggers an ICE STRIKE: -25% bandwidth and the probe is recalled
-to its entry point.
+player) triggers an ICE STRIKE: -25% bandwidth, and the striking daemon
+is knocked back one cell and stunned for 4 ticks. The probe keeps its
+position - recovery is about escaping the daemon's range, not a walk of
+shame to the entry point.
 """
 
 from .physics import DIR4
 
 ICE_STRIKE_COST = 25
-HUNTER_SENSE_RANGE = 7
+HUNTER_SENSE_RANGE = 6
+DAEMON_STUN_TICKS = 4
 
 ENEMY_BLOCKED_TERRAIN = ("#", ">", "<", "^", "v", "T", "U", "E")
 
@@ -85,19 +90,32 @@ def _step_hunter(layout, en: dict, player, occupied: set[tuple[int, int]], rng) 
     return cand
 
 
-def _step_corruptor(layout, en: dict, mirrors, occupied: set[tuple[int, int]]) -> tuple[int, int] | None:
-    """Walk to the nearest mirror; flip it when adjacent. Returns new pos or None."""
+def _step_corruptor(
+    layout, en: dict, mirrors, occupied: set[tuple[int, int]], rng
+) -> tuple[int, int] | None:
+    """Flip an adjacent mirror, then wander off for a few ticks (cooldown) so
+    runners get a window to restore their optics. Returns new pos or None."""
     px, py = _pos(en)
-    # Adjacent mirror (or underfoot): flip it in place.
+    if en.get("cooldown", 0) > 0:
+        en["cooldown"] -= 1
+        dx, dy = en["dir"]
+        cand = (px + dx, py + dy)
+        if cell_blocked_for_enemy(layout, occupied, cand):
+            en["dir"] = (-dx, -dy)
+            cand = (px - dx, py - dy)
+            if cell_blocked_for_enemy(layout, occupied, cand):
+                return None
+        en["pos"] = cand
+        return cand
+    # Adjacent mirror (or underfoot): flip it, then back off.
     for dx, dy in DIR4:
         if (px + dx, py + dy) in mirrors:
             mirrors[(px + dx, py + dy)] = (
                 "/" if mirrors[(px + dx, py + dy)] == "\\" else "\\"
             )
-            en["cooldown"] = 2
+            en["cooldown"] = 4
+            en["dir"] = rng.choice(DIR4)
             return None
-    if en.get("cooldown", 0) > 0:
-        en["cooldown"] -= 1
     if not mirrors:
         return None
     # Close on the nearest mirror (greedy; ties broken by distance then x, y).
@@ -119,24 +137,35 @@ def _step_corruptor(layout, en: dict, mirrors, occupied: set[tuple[int, int]]) -
     return None
 
 
-def step_daemons(game) -> bool:
-    """Tick every daemon one step. Returns True if the probe was struck.
+def step_daemons(game) -> list[tuple[dict, tuple[int, int]]]:
+    """Tick every daemon one step. Returns (daemon, origin) strike pairs.
 
     Called by Game after every successful player action. Handles daemon-
-    daemon collision (later daemons respect earlier positions this tick)
-    and probe contact.
+    daemon collision (later daemons respect earlier positions this tick),
+    stun timers and probe contact.
     """
-    struck = False
+    strikes: list[tuple[dict, tuple[int, int]]] = []
     occupied = {en["pos"] for en in game.daemons}
     for en in game.daemons:
         occupied.discard(en["pos"])
         prev = en["pos"]
+        if en.get("stun", 0) > 0:
+            en["stun"] -= 1
+            occupied.add(prev)
+            continue
+        if en["kind"] == "hunter":
+            # Hunters are fast-minded but slow-footed: they act every other
+            # tick, so a running probe can always outrun them.
+            en["clock"] = 1 - en.get("clock", 0)
+            if en["clock"] == 0:
+                occupied.add(prev)
+                continue
         if en["kind"] == "sentinel":
             new = _step_sentinel(game.layout, en, occupied)
         elif en["kind"] == "hunter":
             new = _step_hunter(game.layout, en, game.player, occupied, game.rng)
         elif en["kind"] == "corruptor":
-            new = _step_corruptor(game.layout, en, game.mirrors, occupied)
+            new = _step_corruptor(game.layout, en, game.mirrors, occupied, game.rng)
         else:  # pragma: no cover - kinds are fixed at spawn
             new = None
         if new is None:
@@ -144,5 +173,22 @@ def step_daemons(game) -> bool:
             continue
         occupied.add(new)
         if new == game.player:
-            struck = True
-    return struck
+            strikes.append((en, prev))
+    return strikes
+
+
+def knock_back(en: dict, origin: tuple[int, int], player: tuple[int, int], game) -> None:
+    """Push a striking daemon off the probe: prefer the cell it came from,
+    else any free neighbor. Falls back to stun only."""
+    candidates = [origin] if origin != player else []
+    px, py = en["pos"]
+    candidates += [
+        (px + dx, py + dy)
+        for dx, dy in DIR4
+        if (px + dx, py + dy) != player
+    ]
+    occupied = {o["pos"] for o in game.daemons} | {game.player}
+    for cand in candidates:
+        if not cell_blocked_for_enemy(game.layout, occupied, cand):
+            en["pos"] = cand
+            return

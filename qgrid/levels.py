@@ -204,4 +204,3 @@ def parse_level(rows: tuple[str, ...], name: str = "?") -> LevelLayout:
 
 
 LEVELS: tuple[LevelDef, ...] = tuple(LevelDef(**d) for d in LEVEL_DATA)
-ZONES: tuple[LevelDef, ...] = tuple(LEVELS)  # 48 nodes, zone via defn.zone

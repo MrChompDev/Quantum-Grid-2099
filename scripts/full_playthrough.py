@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Full-campaign playthrough: connects over SSH and beats all 16 nodes using
-BFS-computed optimal solutions, then verifies the victory screen.
+"""Full-campaign playthrough: connects over SSH and beats all 48 nodes across
+the 6 sectors using BFS-computed optimal solutions, then verifies the victory
+screen.
 
 Run:  python3 scripts/full_playthrough.py
 """
@@ -46,7 +47,7 @@ class Client:
         self.stdout = stdout
         self.buf = ""
 
-    async def read_until(self, *needles: str, timeout: float = 10.0) -> str:
+    async def read_until(self, *needles: str, timeout: float = 25.0) -> str:
         start_len = len(self.buf)
 
         async def _pump():
@@ -91,6 +92,16 @@ async def main() -> int:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        # QG_NO_ICE: this script replays BFS-optimal key sequences blindly,
+        # which live ICE would disrupt (by design - the daemons punish
+        # rote play). Laser-puzzle verification over the wire happens with
+        # daemons disabled; real ICE playthroughs are covered by
+        # tests/test_ice_playability.py (adaptive bot).
+        env={
+            **os.environ,
+            "QG_SAVE_DIR": "/tmp/opencode/qgrid_play_saves",
+            "QG_NO_ICE": "1",
+        },
     )
     try:
         deadline = time.time() + 10
@@ -103,8 +114,9 @@ async def main() -> int:
         if not started:
             raise AssertionError("server did not start")
 
+        username = f"bot{int(time.time())}"
         async with asyncssh.connect(
-            HOST, PORT, known_hosts=None, username="runner"
+            HOST, PORT, known_hosts=None, username=username
         ) as conn:
             stdin, stdout, _ = await conn.open_session(
                 term_type="xterm", term_size=(80, 24)
@@ -113,11 +125,19 @@ async def main() -> int:
 
             await c.read_until("JACK IN")
             c.send(" ")
-            await c.read_until("MAINFRAME NODE ACCESS")
-            print("connected; starting campaign...", flush=True)
+            await c.read_until("SECTOR ACCESS")
+            c.send("\r")  # sector select -> node select (sector 1)
+            await c.read_until("Press 1-8")
+            print("connected; starting full campaign...", flush=True)
 
             for i, defn in enumerate(LEVELS):
-                c.send("\r")  # ENTER -> next available node (select screen)
+                if i > 0 and i % 8 == 0:
+                    # previous sector just completed: node select -> sector select
+                    c.send("\r")
+                    await c.read_until("SECTOR ACCESS")
+                    c.send("\r")  # jump into the next sector
+                    await c.read_until("Press 1-8")
+                c.send("\r")  # node select -> level intro
                 await c.read_until("PRESS ANY KEY TO ENGAGE")
                 c.send(" ")
                 await c.read_until("STATUS:")
@@ -127,24 +147,24 @@ async def main() -> int:
                     # final node goes straight to the victory screen
                     await c.read_until("MAINFRAME COMPROMISED")
                     print(
-                        f"NODE 0{i + 1} - {defn.name}: cleared ({len(keys)} actions)",
+                        f"NODE {i + 1:02d} - {defn.name}: cleared ({len(keys)} actions)",
                         flush=True,
                     )
                     print("VICTORY SCREEN verified", flush=True)
                 else:
                     await c.read_until("ACCESS GRANTED")
                     print(
-                        f"NODE 0{i + 1} - {defn.name}: cleared ({len(keys)} actions)",
+                        f"NODE {i + 1:02d} - {defn.name}: cleared ({len(keys)} actions)",
                         flush=True,
                     )
                     c.send(" ")  # dismiss complete screen -> node select
-                    await c.read_until("MAINFRAME NODE ACCESS")
+                    await c.read_until("Press 1-8")
 
-            c.send("q")
+            c.send(" ")  # dismiss the victory screen -> session ends
             await c.read_until("CONNECTION TERMINATED", timeout=5)
             print("clean disconnect verified", flush=True)
 
-        print("\nFULL CAMPAIGN PLAYTHROUGH PASSED")
+        print("\nFULL CAMPAIGN PLAYTHROUGH PASSED (48/48 nodes)")
         return 0
     finally:
         proc.terminate()

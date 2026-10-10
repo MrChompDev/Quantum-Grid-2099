@@ -1,3 +1,4 @@
-"""Quantum Grid 2099 — cyberpunk laser-reflection puzzle for the terminal."""
+"""Quantum Grid 2099 — BLACKOUT PROTOCOL, a cyberpunk laser-reflection
+puzzle game with live ICE, played over SSH."""
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

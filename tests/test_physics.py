@@ -237,3 +237,123 @@ class TestLevelParsing:
             assert layout.player_start != layout.exit_pos
             w, h = layout.width, layout.height
             assert all(0 < x < w - 1 and 0 < y < h - 1 for x, y in layout.receptors)
+
+
+class TestSplitterPrism:
+    def test_splitter_forks_perpendicular(self):
+        """Beam moving right into a prism forks up AND down, no pass-through."""
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>....+............#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert (5, 3) in t.h  # approach
+        assert (6, 2) in t.v  # fork up
+        assert (6, 4) in t.v  # fork down
+        assert (7, 3) not in t.h  # no pass-through
+
+    def test_splitter_forks_vertical(self):
+        """Beam moving down into a prism forks left AND right."""
+        t = trace(
+            [
+                "#@........v........#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#.........+........#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert (11, 5) in t.h  # fork right
+        assert (9, 5) in t.h  # fork left
+        assert (10, 6) not in t.v  # no pass-through
+
+    def test_splitter_loop_terminates(self):
+        """Two facing prisms create a beam loop: must terminate via loop guard."""
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>....+............#",
+                "#.....+............#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert isinstance(t.h, set) and isinstance(t.v, set)
+
+    def test_splitter_powers_both_receptor_branches(self):
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>....+............#",
+                "#.....*............#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert (6, 4) in t.powered  # fork down hits the receptor
+        assert (6, 1) in t.v  # fork up continues
+
+
+class TestNewTileTransparency:
+    def test_beam_passes_through_shard(self):
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>....$............#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert (6, 3) in t.h
+        assert (7, 3) in t.h
+
+    def test_beam_passes_through_teleport_pads(self):
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>...TU............#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        assert (4, 3) in t.h and (5, 3) in t.h and (6, 3) in t.h
+
+    def test_beam_ignores_ice_spawn_markers(self):
+        t = trace(
+            [
+                "#@.................#",
+                "#..................#",
+                "#>....S.H.C........#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+                "#..................#",
+            ]
+        )
+        for x in (6, 8, 10):
+            assert (x, 3) in t.h

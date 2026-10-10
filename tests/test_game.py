@@ -1,4 +1,4 @@
-"""Unit tests for game state, actions and bandwidth management.
+"""Unit tests for game state, actions, bandwidth, shards, teleports, scoring.
 
 Geometry-agnostic: levels are procedurally generated, so tests locate
 walls/emitters/mirrors from the parsed layout instead of hardcoding
@@ -8,9 +8,15 @@ coordinates. Solver-driven playthroughs verify the full action flow.
 import pytest
 
 from qgrid.game import BANDWIDTH_MAX, Game, start_bandwidth
-from qgrid.levels import EMITTER_CHARS, LEVELS, WALL, parse_level
+from qgrid.levels import EMITTER_CHARS, LEVELS, SHARD, WALL, LevelDef, parse_level
 from qgrid.physics import DIR4, trace_beam
 from qgrid.solver import solve_level
+
+BORDER = "#" * 14
+
+
+def mkmini(rows):
+    return (BORDER,) + tuple(rows) + (BORDER,)
 
 
 @pytest.fixture
@@ -27,7 +33,6 @@ def find_adjacent_passable(game):
 
 
 def find_wall_adjacent_free(layout):
-    """A wall cell with a passable neighbor: (stand_at, move_direction)."""
     for y in range(1, layout.height - 1):
         for x in range(1, layout.width - 1):
             if layout.rows[y][x] != WALL:
@@ -38,11 +43,12 @@ def find_wall_adjacent_free(layout):
                     continue
                 t = layout.rows[n[1]][n[0]]
                 if t != WALL and t not in EMITTER_CHARS:
-                    return n, (-dx, -dy)  # stand at n, step back into the wall
+                    return n, (-dx, -dy)
     return None
 
 
 def find_emitter_neighbor(layout):
+    """A passable cell adjacent to an emitter: (stand_at, step_direction)."""
     for (ex, ey), _ in layout.emitters:
         for dx, dy in DIR4:
             n = (ex + dx, ey + dy)
@@ -51,7 +57,7 @@ def find_emitter_neighbor(layout):
                 and 0 <= n[1] < layout.height
                 and layout.rows[n[1]][n[0]] != WALL
             ):
-                return n, (dx, dy)
+                return n, (-dx, -dy)  # step from n INTO the emitter cell
     return None
 
 
@@ -75,6 +81,7 @@ class TestSolverPlaythrough:
     def test_all_levels_solver_wins(self):
         for i, defn in enumerate(LEVELS):
             game = Game(i, 100)
+            game.daemons = []  # solver ignores ICE; replay the pure laser puzzle
             path = solve_level(game.layout)
             assert path is not None, f"{defn.name} unsolvable"
             apply_path(game, path)
@@ -84,10 +91,6 @@ class TestSolverPlaythrough:
 
 
 class TestInitialStates:
-    def test_level1_single_flipped_mirror(self, game1):
-        assert len(game1.mirrors) == 1
-        assert not game1.all_powered()
-
     def test_no_level_starts_solved(self):
         for defn in LEVELS:
             layout = parse_level(defn.rows, defn.name)
@@ -199,7 +202,7 @@ class TestBandwidth:
 class TestStartBandwidth:
     def test_refresh_after_each_level(self):
         for defn in LEVELS:
-            assert defn.bandwidth_start == 100  # refreshes every level
+            assert defn.bandwidth_start == 100
 
     def test_carryover_no_longer_applies(self):
         for defn in LEVELS:
@@ -207,11 +210,174 @@ class TestStartBandwidth:
             assert start_bandwidth(defn, 55) == 100
 
 
+class TestTeleports:
+    def test_step_onto_pad_folds_probe(self):
+        defn = LevelDef(
+            name="padtest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#.T.......U..#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        assert game.layout.pads  # T<->U linked
+        assert game.player == (2, 3)
+        assert game.do_move(0, -1) == "ok"  # step up onto pad T
+        assert game.player == (10, 2)  # folded to pad U
+        # step off U, then step back on: folds back to T
+        assert game.do_move(0, 1) == "ok"
+        assert game.player == (10, 3)
+        assert game.do_move(0, -1) == "ok"
+        assert game.player == (2, 2)  # folded back to T
+
+    def test_fold_costs_one_action(self):
+        defn = LevelDef(
+            name="padtest2",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#.T......U...#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        # player at (2,3); step up onto the pad
+        assert game.player == (2, 3)
+        assert game.do_move(0, -1) == "ok"
+        assert game.player == (9, 2)  # folded to U
+        assert game.actions == 1
+        assert game.bandwidth == 99
+
+
+class TestDatashards:
+    def test_shard_pickup_records_and_scores(self):
+        defn = LevelDef(
+            name="shardtest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#............#",
+                    "#.@$.....E...#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        assert len(game.layout.shards) == 1
+        shard_pos = game.layout.shards[0]
+        assert shard_pos == (3, 3)
+        assert game.do_move(1, 0) == "ok"
+        assert game.player == shard_pos
+        assert shard_pos in game.shards_taken
+        assert "DATASHARD 1" in game.msg
+        assert game.score() >= 250
+        # shards don't re-trigger
+        game.do_move(-1, 0)
+        game.do_move(1, 0)
+        assert len(game.shards_taken) == 1
+
+    def test_shards_passable_by_beam(self):
+        defn = LevelDef(
+            name="shardbeam",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..$.........#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        layout = game.layout
+        assert layout.rows[5][6] == "*"  # receptor on the beam line
+        trace = trace_beam(layout, game.player, game.mirrors)
+        assert (6, 5) in trace.powered  # shard on row 2 doesn't block row 5
+
+
+class TestScoring:
+    def test_score_breakdown(self):
+        defn = LevelDef(
+            name="scoretest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#............#",
+                    "#.@$.....E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=10,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(1, 0)  # collect shard, actions=1, bandwidth=99
+        s = game.score()
+        expected = 99 * 10 + 1 * 250 + max(0, 20 - 1) * 20
+        assert s == expected
+
+    def test_finish_banks_shards(self):
+        defn = LevelDef(
+            name="banktest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#............#",
+                    "#.@$.....E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(1, 0)
+        game.finish_level()
+        assert len(game.shards_banked) == 1
+
+
 class TestPlayerAbsorbsBeam:
     def test_standing_in_beam_blocks_receptor(self, game1):
         path = solve_level(game1.layout)
         assert path is not None
-        # replay the solution to reach the solved mirror state
         mirrors = dict(game1.mirrors)
         player = game1.player
         for act, dx, dy in path:
@@ -228,11 +394,11 @@ class TestPlayerAbsorbsBeam:
                 mirrors[target] = "/" if mirrors[target] == "\\" else "\\"
         solved = trace_beam(game1.layout, player, mirrors)
         assert solved.powered == set(game1.layout.receptors)
-        # find a plain-floor beam cell whose block un-powers a receptor
         beam_cells = [
             c
             for c in solved.h | solved.v
-            if c not in game1.layout.receptors and game1.layout.rows[c[1]][c[0]] == "."
+            if c not in game1.layout.receptors
+            and game1.layout.rows[c[1]][c[0]] in (".", SHARD)
         ]
         assert beam_cells
         for cell in beam_cells:

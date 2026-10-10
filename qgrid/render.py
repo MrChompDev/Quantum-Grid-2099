@@ -8,8 +8,8 @@ full clears (\\033[2J) are used only on screen transitions.
 """
 
 from . import assets
-from .levels import EMITTER_CHARS, EXIT, LevelDef, SHARD, SPLITTER, WALL
-from .lore import CODEX, GHOST_TRANSMISSIONS, ZONES, rank_for
+from .levels import EMITTER_CHARS, EXIT, SHARD, SPLITTER, WALL, LevelDef
+from .lore import CODEX, ZONES, rank_for
 
 ESC = "\x1b"
 ESC_K = f"{ESC}[K"
@@ -41,7 +41,6 @@ GRAY = "90"
 BLUE = "34"
 ICE_MAGENTA = "1;35"  # ICE daemons
 PAD_MAGENTA = "95"  # teleport pads
-GREEN = "1;32"
 
 ZONE_SIZE = 8
 ZONE_COUNT = 6
@@ -379,7 +378,6 @@ def render_node_select(
     width: int = MIN_W,
     height: int = MIN_H,
 ) -> str:
-    from .levels import LEVELS
 
     zone = ZONES[zone_num - 1]
     body = [
@@ -399,7 +397,7 @@ def render_node_select(
     body.extend(
         [
             "",
-            "  Press 1-8 to jack in | ENTER: next uncleared node | Q: back to sectors",
+            "  Press 1-8 to jack in | ENTER: next uncleared node | Q: disconnect",
         ]
     )
     return _screen(body, width, height)
@@ -589,7 +587,11 @@ def render_victory(
     height: int = MIN_H,
 ) -> str:
     """Final campaign screen: rank + ending (true if enough shards banked)."""
-    from .lore import SHARDS_FOR_TRUE_ENDING
+    from .lore import (
+        SHARDS_FOR_TRUE_ENDING,
+        STANDARD_ENDING_LORE,
+        TRUE_ENDING_LORE,
+    )
 
     banked = sum(len(v) for v in save.get("shards", {}).values())
     score = save.get("total_score", 0)
