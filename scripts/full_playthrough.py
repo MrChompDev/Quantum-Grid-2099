@@ -26,7 +26,9 @@ PORT = 2299
 HOST = "127.0.0.1"
 KEY = "/tmp/opencode/qgrid_smoke_key"
 
-ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[=>]")
+ANSI_RE = re.compile(
+    r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[=>]|\x1bP.*?\x1b\\"  # CSI + DCS tone markers"
+)
 KEY_FOR_DIR = {v: k for k, v in DIR_VECTORS.items()}
 
 

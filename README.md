@@ -2,7 +2,8 @@
 
 A cyberpunk laser-reflection puzzle game played entirely over SSH — now with
 live ICE daemons, splitter prisms, teleport arrays, datashards, persistent
-saves, a 16-entry codex and two endings.
+saves, a 16-entry codex, two endings, an 8-bit chiptune engine and a
+pixel-doubled playfield.
 
 You are **NYX**: a netrunner with a light-beam probe and a brother the Grid
 erased. Descend through **6 sectors and 48 nodes** of OMNICORP's Quantum
@@ -58,6 +59,7 @@ your SSH username **is your save file**. Log in as the same user to resume.
 | `QG_UNLOCK_ALL=1` | Unlock all 48 nodes from the start (demo/judging mode) |
 | `QG_NO_ICE=1` | Disable ICE daemons (laser-puzzle verification runs) |
 | `QG_SAVE_DIR=...` | Save directory (default: `./saves`) |
+| `QG_AUDIO=off` | Initial sound mode: `full` / `music` / `sfx` / `off` |
 
 ## The Campaign
 
@@ -80,11 +82,68 @@ par (optimal action count) after extraction.
 | `W A S D` / arrow keys | Move the light-beam probe |
 | `R` | Rotate an adjacent (or underfoot) mirror |
 | `K` | Restart the current node (restores entry bandwidth) |
+| `M` | Cycle sound mode: full → music → SFX → off |
 | `C` | Open the codex (from sector / node select) |
 | `1`–`6` | Pick a sector |
 | `1`–`8` | Pick a node within a sector |
 | `ENTER` | Continue: next uncleared node |
 | `Q` | Disconnect |
+
+## Sound & Visuals
+
+### Hearing the soundtrack (companion client)
+
+SSH is a text channel — the game cannot play audio on your machine by
+itself. The companion client fixes that: run it instead of plain `ssh`
+and it synthesizes the entire chiptune **locally as real 8-bit audio**
+(square-wave synthesis, no dependencies):
+
+```bash
+python3 -m qgrid.audio_client -- ssh -p 2222 <host>
+```
+
+It bridges a PTY: your keystrokes and the game's rendering pass through
+untouched, while the tone markers embedded in the stream are intercepted
+and played through your actual speakers (`paplay` / `pw-play` / `aplay` /
+`ffplay` / `mpv` on Linux, `afplay` on macOS, `[console]::beep` on
+Windows—under WSL). Melodies, SFX, everything.
+
+Running bare `ssh` instead? You still get the terminal-bell fallback
+(beep rhythms). If you hear *nothing*: most terminals ship with the
+audible bell muted — either use the companion client, or enable the
+"audible bell" setting in your terminal. Servers can run with
+`QG_BELL=off` to mute the bell when using the companion (avoids
+double-beeps).
+
+### 8-bit chiptune engine
+
+SSH is a text channel, so the soundtrack is synthesized through the
+terminal bell — pitch-programmed square-wave tones (`CSI 10;Hz` + BEL):
+
+- **Music loops:** title theme, explore theme, and a **danger theme** that
+  kicks in automatically when a hunter ICE gets within striking range.
+- **~12 SFX:** move/rotate blips, receptor power-ups, shard arpeggios,
+  teleport zaps, ICE-strike hits, extraction fanfares, game-over dirge,
+  campaign victory fanfare.
+- **`M`** cycles full → music → sfx → off. `QG_AUDIO` sets the default.
+- **Companion client = real melodies** (see above). The bell fallback
+  plays pitch-programmed tones on PC-speaker terminals (Linux console)
+  and bell rhythms elsewhere.
+- The **equalizer strip** in the HUD animates with the music either way.
+
+### Visual effects
+
+- **2×2 pixel-doubling:** the grid auto-upscales to chunky 8-bit blocks
+  whenever your terminal fits it (2×2 diagonal mirrors, doubled walls and
+  daemons). On an 80x24 terminal the chrome shrinks to 5 lines so the grid
+  fills the screen; on a large terminal the grid itself quadruples in area.
+- **Beam shimmer:** laser trails pulse between single/double-line glyphs.
+- **Flash bursts:** receptors flare when powered, shards sparkle, both
+  teleport pads light up on a fold, the exit node flares when unlocked.
+- **Screen shake + red alert rule** on ICE strikes, with a red rule tint
+  while the shake is active.
+- **Animated screens:** sweeping laser-lane on the title, blinking
+  prompts, pulsing banners on victory.
 
 ## Mechanics
 
@@ -159,7 +218,9 @@ qgrid/
   enemies.py       ICE daemon AI (sentinel / hunter / corruptor, stun, knockback)
   solver.py        BFS solver over (player, mirror-state) space, teleport-aware
   game.py          game state, turns, ICE strikes, shards, teleports, scoring
-  render.py        adaptive full-terminal ANSI frames + all screens
+  audio.py         8-bit chiptune engine (bell tones, songs, SFX, modes)
+  audio_client.py  companion player: PTY bridge + local square-wave synth
+  render.py        adaptive full-terminal ANSI frames, 2x2 upscaling, VFX
   save.py          per-username JSON persistence
   server.py        asyncssh server, session state machine, raw input handling
 tests/             unit + solver + live-ICE bot + campaign verification tests

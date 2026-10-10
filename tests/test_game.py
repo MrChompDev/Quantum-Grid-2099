@@ -410,3 +410,101 @@ class TestPlayerAbsorbsBeam:
                 assert not game1.all_powered()
                 return
         pytest.fail("no beam cell blocks a receptor when occupied")
+
+
+class TestGameFxEvents:
+    def test_rotate_sets_event(self):
+        # A mirror that does not touch the beam: rotating must report the
+        # rotate event (power events override it only when they fire).
+        defn = LevelDef(
+            name="rotfx",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#............#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#./..........#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(0, 2)  # step beside the mirror at (2,6)
+        game.event = None
+        assert game.do_rotate() is True
+        assert game.event == "rotate"
+
+    def test_all_powered_sets_event_and_exit_flash(self):
+        defn = LevelDef(
+            name="powertest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#............#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(1, 0)
+        assert game.event == "all_powered"  # this mini level starts solved
+        assert game.layout.exit_pos in game.flash
+
+    def test_shake_and_flash_on_strike(self):
+        defn = LevelDef(
+            name="shaketest",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..@.H....E..#",
+                    "#............#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(1, 0)  # hunter closes in -> strike
+        assert game.shake > 0
+        assert game.event == "strike"
+
+    def test_teleport_sets_event_and_flash(self):
+        defn = LevelDef(
+            name="tpfx",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#.T......U...#",
+                    "#.@......E...#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(0, -1)  # onto pad T -> fold
+        assert game.event == "teleport"
+        assert game.flash.get((9, 2), 0) > 0  # destination pad flashing
+        assert game.flash.get((2, 2), 0) > 0  # origin pad flashing

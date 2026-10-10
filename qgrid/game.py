@@ -73,11 +73,42 @@ class Game:
             "Inspect the optical layout. Move adjacent to a mirror and rotate it."
         )
         self.trace = trace_beam(self.layout, self.player, self.mirrors)
+        # --- VFX / event state (consumed by the renderer + server audio) ---
+        self.flash: dict[tuple[int, int], int] = {}  # pos -> renders remaining
+        self.shake = 0  # renders of screen-shake remaining
+        self.event: str | None = None  # last gameplay event for SFX routing
 
     # ------------------------------------------------------------------ state
 
     def refresh(self) -> None:
         self.trace = trace_beam(self.layout, self.player, self.mirrors)
+
+    def decay_fx(self) -> None:
+        """Age transient visual effects by one rendered frame."""
+        if self.flash:
+            self.flash = {
+                pos: n - 1 for pos, n in self.flash.items() if n > 1
+            }
+        if self.shake > 0:
+            self.shake -= 1
+
+    def _fx(self, kind: str, fresh: set | None = None) -> None:
+        """Record a gameplay event for SFX routing and its visual flourishes."""
+        self.event = kind
+        if kind == "power" and fresh:
+            for p in fresh:
+                self.flash[p] = 3
+        elif kind == "shard":
+            self.flash[self.player] = 4
+        elif kind == "teleport":
+            self.flash[self.player] = 4
+            for pad in self.layout.pads:
+                self.flash.setdefault(pad, 4)
+        elif kind == "strike":
+            self.shake = 3
+            self.flash[self.player] = 3
+        elif kind == "all_powered":
+            self.flash[self.layout.exit_pos] = 4
 
     def all_powered(self) -> bool:
         return self.trace.powered == set(self.layout.receptors)
@@ -101,6 +132,7 @@ class Game:
         total = len(self.layout.receptors)
         if self.all_powered():
             self.msg = "ALL RECEPTORS ONLINE - Extraction node E is active. Extract!"
+            self._fx("all_powered")
             return
         fresh = self.trace.powered - prev
         remaining = total - len(self.trace.powered)
@@ -111,8 +143,10 @@ class Game:
                 f"Receptor {idx} powered. {remaining} target"
                 f"{'s' if remaining != 1 else ''} remaining."
             )
+            self._fx("power", fresh)
         else:
             self.msg = f"{verb} Target node unpowered. Re-route beam line."
+            self.event = self.event or "move"
 
     # ------------------------------------------------------------------ turns
 
@@ -137,6 +171,7 @@ class Game:
         self.msg = (
             f"ICE STRIKE! -{ice.ICE_STRIKE_COST}% bandwidth. Daemon stunned - move!"
         )
+        self._fx("strike")
 
     # ---------------------------------------------------------------- actions
 
@@ -161,10 +196,12 @@ class Game:
         # the fold is part of the step, matching the BFS solver's model).
         if (nx, ny) in self.layout.pads:
             self.player = self.layout.pads[(nx, ny)]
+            self._fx("teleport")
         self.refresh()
         terrain = self._terrain(self.player[0], self.player[1])
         if terrain == EXIT and not self.exit_active():
             self.msg = "Extraction node offline. Power all receptors first."
+            self.event = self.event or "move"
         else:
             self._note_power_delta(prev, "Probe repositioned.")
         self._pickup_shard()  # shard transmissions take message priority
@@ -192,6 +229,7 @@ class Game:
                 f"ICE STRIKE! -{ice.ICE_STRIKE_COST}% bandwidth."
                 " Daemon stunned - move!"
             )
+            self._fx("strike")
             return
 
     def do_rotate(self) -> bool:
@@ -212,6 +250,7 @@ class Game:
         self.mirrors[target] = "/" if self.mirrors[target] == "\\" else "\\"
         self.actions += 1
         self.bandwidth = max(0, self.bandwidth - BANDWIDTH_STEP)
+        self.event = "rotate"
         self.refresh()
         self._note_power_delta(prev, "Optical unit rotated. Beam re-routed.")
         self._tick()
@@ -225,6 +264,7 @@ class Game:
         n = len(self.shards_taken)
         line = GHOST_TRANSMISSIONS[(self.level_index + n) % len(GHOST_TRANSMISSIONS)]
         self.msg = f"DATASHARD {n} acquired. MIRAGE>> {line}"
+        self._fx("shard")
 
     def restart(self) -> None:
         """Reset the current node to its entry state and restore bandwidth."""
@@ -235,6 +275,9 @@ class Game:
         self.actions = 0
         self.strikes = 0
         self.shards_taken = set()
+        self.flash = {}
+        self.shake = 0
+        self.event = None
         self.rng = random.Random(self._rng_seed)
         self.daemons = (
             []

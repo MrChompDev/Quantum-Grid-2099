@@ -2,8 +2,10 @@
 
 Runs an asyncssh server on port 2222. Every incoming connection gets its
 own independent asyncio session:
-  title -> save menu -> sector select -> node select -> gameplay loop
-  (+ codex screen, persistent per-username saves).
+  animated title -> save menu -> sector select -> node select -> gameplay
+  (+ codex screen, persistent per-username saves, 8-bit chiptune engine,
+  idle VFX loop that re-renders the grid for shimmer/flash/shake effects
+  and switches the music to danger mode when hunters close in).
 Keypresses are read non-blocking (1 byte at a time) from the SSH channel.
 """
 
@@ -12,18 +14,13 @@ import os
 
 import asyncssh
 
+from . import audio
 from . import save as save_mod
 from .game import DIR_VECTORS, Game, start_bandwidth
 from .levels import LEVELS
-from .lore import (
-    CODEX,
-    CODEX_ON_NODE,
-    CODEX_ON_START,
-    CODEX_ON_ZONE,
-)
+from .lore import CODEX, CODEX_ON_NODE, CODEX_ON_START, CODEX_ON_ZONE
 from .render import (
     CLEAR,
-    HIDE_CURSOR,
     MIN_H,
     MIN_W,
     SHOW_CURSOR,
@@ -47,7 +44,7 @@ ARROW_MAP = {"A": "w", "B": "s", "C": "d", "D": "a"}
 
 QUIT = None  # EOF, Ctrl-C or 'q'
 NOOP = ""  # ignored input
-_TIMEOUT = object()  # digit-buffer window expired (distinct from QUIT)
+_TIMEOUT = object()  # animation tick expired (distinct from QUIT)
 
 
 class QuantumGridServer(asyncssh.SSHServer):
@@ -88,6 +85,12 @@ class Session:
         self.total_actions = 0
         self.session_score = 0
         self.width, self.height = self._frame_size()
+        # --- audio + VFX state ---
+        self.tone = audio.Tone(self.write)
+        self.player = audio.MusicPlayer(self.tone)
+        self.frame_no = 0
+        self._fx_game: Game | None = None
+        self._fx_task: asyncio.Task | None = None
 
     def _frame_size(self) -> tuple[int, int]:
         """Terminal size, clamped to at least 80x24 (re-read per frame)."""
@@ -107,7 +110,7 @@ class Session:
         """Read one keypress.
 
         Returns QUIT on EOF / Ctrl-C / 'q', or a normalized key character:
-        wasd/r/k/c/n digits, ENTER, or space.
+        wasd/r/k/c/n/m digits, ENTER, or space.
         """
         while True:
             try:
@@ -129,12 +132,21 @@ class Session:
                 return QUIT
             if ch in DIR_VECTORS:
                 return ch
-            if ch in ("r", "R", "k", "K", "c", "C", "n", "N", "s", "S", "w", "W"):
+            if ch in (
+                "r", "R", "k", "K", "c", "C", "n", "N", "m", "M", "s", "S", "w", "W"
+            ):
                 return ch.lower()
             if ch.isdigit() or ch in ("\r", "\n", " "):
                 return ch
             # Ignore anything else and wait for the next real keypress.
             continue
+
+    async def read_key_or_wait(self, timeout: float) -> str | None:
+        """One keypress, or _TIMEOUT if nothing arrives within `timeout`."""
+        try:
+            return await asyncio.wait_for(self.read_key(), timeout)
+        except (asyncio.TimeoutError, TimeoutError):
+            return _TIMEOUT
 
     async def _consume_escape(self) -> str:
         """Consume an ANSI escape sequence; map arrow keys to WASD."""
@@ -149,6 +161,77 @@ class Session:
         except (asyncio.TimeoutError, TimeoutError):
             return NOOP
         return ARROW_MAP.get(final, NOOP)
+
+    # ------------------------------------------------------------------- sfx
+
+    def play_event(self, event: str | None) -> None:
+        """Route a gameplay event to the chiptune engine."""
+        if not event:
+            return
+        mapping = {
+            "strike": "strike",
+            "shard": "shard",
+            "teleport": "teleport",
+            "all_powered": "all_powered",
+            "power": "power",
+            "rotate": "rotate",
+            "move": "blip",
+        }
+        name = mapping.get(event)
+        if name:
+            self.player.sfx(name)
+
+    def toggle_sound(self) -> None:
+        self.player.cycle_mode()
+        if self.player.sfx_on:
+            self.player.sfx("menu")
+
+    # ------------------------------------------------------------------- VFX
+
+    async def _fx_loop(self) -> None:
+        """Idle animation: re-render the live grid so beams shimmer, flashes
+        decay, the screen shakes, and danger-mode music kicks in."""
+        while True:
+            await asyncio.sleep(0.25)
+            game = self._fx_game
+            if game is None:
+                continue
+            self.frame_no += 1
+            game.decay_fx()
+            danger = any(
+                en["kind"] == "hunter"
+                and en.get("stun", 0) <= 0
+                and abs(en["pos"][0] - game.player[0])
+                + abs(en["pos"][1] - game.player[1])
+                <= 6
+                for en in game.daemons
+            )
+            self.player.set_song("danger" if danger else "explore")
+            self.width, self.height = self._frame_size()
+            self.write(
+                render_frame(
+                    game,
+                    self.width,
+                    self.height,
+                    self.session_score,
+                    self.frame_no,
+                    self.player.music_on,
+                )
+            )
+
+    async def _show_animated(self, render_fn) -> str | None:
+        """Loop an animated screen until a key is pressed. render_fn(frame)
+        returns the frame string. Returns the pressed key or QUIT."""
+        frame = 0
+        while True:
+            self.width, self.height = self._frame_size()
+            self.write(render_fn(frame))
+            key = await self.read_key_or_wait(0.16)
+            if key is QUIT:
+                return QUIT
+            if key is not _TIMEOUT:
+                return key
+            frame += 1
 
     # ------------------------------------------------------------------ saves
 
@@ -186,27 +269,44 @@ class Session:
 
     async def run(self) -> None:
         try:
-            self.write(HIDE_CURSOR + CLEAR + render_title(self.width, self.height))
-            if await self.read_key() is QUIT:
+            self.player.start()
+            self._fx_task = asyncio.get_running_loop().create_task(self._fx_loop())
+            frame = await self._show_animated(
+                lambda f: render_title(self.width, self.height, f, clear=f == 0)
+            )
+            if frame is QUIT:
                 return
             await self._save_menu()
             for key in CODEX_ON_START:
                 self.unlock_codex(key)
+            self.player.set_song("title")
             while True:
                 result = await self._sector_flow()
                 if result == "quit":
                     return
                 if result == "victory":
-                    self.width, self.height = self._frame_size()
-                    self.write(
-                        CLEAR
-                        + render_victory(
-                            self.save, _total_shards_in_game(), self.width, self.height
+                    self.player.set_song(None)
+                    self.player.sfx("victory")
+                    ending = await self._show_animated(
+                        lambda f: render_victory(
+                            self.save,
+                            _total_shards_in_game(),
+                            self.width,
+                            self.height,
+                            f,
                         )
                     )
-                    await self.read_key()
+                    if ending is QUIT:
+                        return
                     return
         finally:
+            if self._fx_task is not None:
+                self._fx_task.cancel()
+                try:
+                    await self._fx_task
+                except asyncio.CancelledError:
+                    pass
+            await self.player.stop()
             self.write(SHOW_CURSOR + render_goodbye(self.width, self.height))
 
     async def _save_menu(self) -> None:
@@ -223,6 +323,9 @@ class Session:
             key = await self.read_key()
             if key is QUIT:
                 return
+            if key == "m":
+                self.toggle_sound()
+                continue
             if key == "n":
                 self.save = save_mod.default_save()
                 if self.unlock_all:
@@ -230,6 +333,7 @@ class Session:
                 save_mod.store(self.username, self.save)
                 return
             if key in ("\r", "\n", " "):
+                self.player.sfx("menu")
                 return
 
     async def _codex_screen(self) -> None:
@@ -244,11 +348,16 @@ class Session:
             key = await self.read_key()
             if key is QUIT or key == "c":
                 return
+            if key == "m":
+                self.toggle_sound()
+                continue
             if key in ("w", "s"):
                 detail = False
                 sel = (sel + (-1 if key == "w" else 1)) % len(CODEX)
+                self.player.sfx("blip")
             elif key in ("\r", "\n", " "):
                 detail = not detail
+                self.player.sfx("menu")
             elif key == "k":
                 return
 
@@ -260,6 +369,7 @@ class Session:
 
     async def _sector_flow(self) -> str:
         """Sector select -> node select -> play. Returns quit/victory/loop."""
+        self.player.set_song("title")
         while True:
             self.width, self.height = self._frame_size()
             self.write(
@@ -271,10 +381,14 @@ class Session:
             key = await self.read_key()
             if key is QUIT:
                 return "quit"
+            if key == "m":
+                self.toggle_sound()
+                continue
             if key == "c":
                 await self._codex_screen()
                 continue
             if key in ("\r", "\n", " "):
+                self.player.sfx("menu")
                 index = self._first_uncleared()
                 result = await self._node_flow(self._sector_for(index))
                 if result != "back":
@@ -283,8 +397,12 @@ class Session:
             if key and key.isdigit() and key != "0":
                 zone = int(key)
                 if 1 <= zone <= ZONE_COUNT:
-                    unlocked = self.unlock_all or self.save.get("unlocked", 0) >= (zone - 1) * ZONE_SIZE
+                    unlocked = (
+                        self.unlock_all
+                        or self.save.get("unlocked", 0) >= (zone - 1) * ZONE_SIZE
+                    )
                     if unlocked:
+                        self.player.sfx("menu")
                         result = await self._node_flow(zone)
                         if result != "back":
                             return result
@@ -302,6 +420,9 @@ class Session:
             key = await self.read_key()
             if key is QUIT:
                 return "quit"
+            if key == "m":
+                self.toggle_sound()
+                continue
             if key == "c":
                 await self._codex_screen()
                 continue
@@ -311,10 +432,8 @@ class Session:
                     return "back"  # sector complete: pick the next sector
                 # jump to the first uncleared node in this sector
                 unlocked = min(self.save.get("unlocked", 0), start + ZONE_SIZE - 1)
-                if unlocked < start:
-                    index = start
-                else:
-                    index = unlocked
+                index = max(unlocked, start)
+                self.player.sfx("menu")
                 result = await self._play_level(index)
                 if result == "next":
                     continue
@@ -326,6 +445,7 @@ class Session:
                     selectable = self.unlock_all or idx <= self.save.get("unlocked", 0)
                     in_sector = idx >= start
                     if selectable and in_sector:
+                        self.player.sfx("menu")
                         result = await self._play_level(idx)
                         if result == "next":
                             continue
@@ -348,51 +468,85 @@ class Session:
         )
         if await self.read_key() is QUIT:
             return "quit"
-        self.write(render_frame(game, self.width, self.height, self.session_score))
-        while True:
-            key = await self.read_key()
-            if key is QUIT:
-                return "quit"
-            if key == "k":
-                game.restart()
-                self.write(
-                    render_frame(game, self.width, self.height, self.session_score)
-                )
-                continue
-            if key in DIR_VECTORS:
-                acted = game.do_move(*DIR_VECTORS[key]) == "ok"
-            elif key == "r":
-                acted = game.do_rotate()
-            else:
-                continue
-            if acted:
-                self.total_actions += 1
-            if game.check_win():
-                self.bank_win(index, game)
-                self.session_score = self.save.get("total_score", 0)
-                self.bandwidth = game.finish_level()
-                if index == len(LEVELS) - 1:
-                    return "victory"
+        self.player.sfx("engage")
+        self.player.set_song("explore")
+        self._fx_game = game
+        self.write(
+            render_frame(
+                game, self.width, self.height, self.session_score,
+                self.frame_no, self.player.music_on,
+            )
+        )
+        try:
+            while True:
+                key = await self.read_key()
+                if key is QUIT:
+                    self._fx_game = None
+                    return "quit"
+                if key == "m":
+                    self.toggle_sound()
+                    self.write(
+                        render_frame(
+                            game, self.width, self.height, self.session_score,
+                            self.frame_no, self.player.music_on,
+                        )
+                    )
+                    continue
+                if key == "k":
+                    game.restart()
+                    self.write(
+                        render_frame(
+                            game, self.width, self.height, self.session_score,
+                            self.frame_no, self.player.music_on,
+                        )
+                    )
+                    continue
+                if key in DIR_VECTORS:
+                    acted = game.do_move(*DIR_VECTORS[key]) == "ok"
+                elif key == "r":
+                    acted = game.do_rotate()
+                else:
+                    continue
+                if acted:
+                    self.total_actions += 1
+                    self.play_event(game.event)
+                    game.event = None
+                if game.check_win():
+                    self.bank_win(index, game)
+                    self.session_score = self.save.get("total_score", 0)
+                    self.bandwidth = game.finish_level()
+                    self._fx_game = None  # stop the idle VFX loop
+                    if index == len(LEVELS) - 1:
+                        return "victory"
+                    self.player.sfx("unlock")
+                    key = await self._show_animated(
+                        lambda f: render_level_complete(
+                            game, index + 1, self.session_score,
+                            self.width, self.height, f,
+                        )
+                    )
+                    if key is QUIT:
+                        return "quit"
+                    return "next"
+                if game.game_over:
+                    self._fx_game = None  # stop the idle VFX loop
+                    self.player.set_song(None)
+                    self.player.sfx("gameover")
+                    key = await self._show_animated(
+                        lambda f: render_game_over(game, self.width, self.height, f)
+                    )
+                    if key is QUIT:
+                        return "quit"
+                    return "next"  # back to node select, progress kept
                 self.width, self.height = self._frame_size()
                 self.write(
-                    CLEAR
-                    + render_level_complete(
-                        game, index + 1, self.session_score, self.width, self.height
+                    render_frame(
+                        game, self.width, self.height, self.session_score,
+                        self.frame_no, self.player.music_on,
                     )
                 )
-                if await self.read_key() is QUIT:
-                    return "quit"
-                return "next"
-            if game.game_over:
-                self.write(
-                    CLEAR + render_game_over(game, self.width, self.height)
-                )
-                await self.read_key()
-                return "next"  # back to node select, progress kept
-            self.width, self.height = self._frame_size()
-            self.write(
-                render_frame(game, self.width, self.height, self.session_score)
-            )
+        finally:
+            self._fx_game = None
 
 
 def _total_shards_in_game() -> int:
