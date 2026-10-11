@@ -26,7 +26,7 @@ class TestAllLevelsSolvable:
             assert d.par is not None and d.par > 0, f"{d.name} missing par"
             assert d.lore, f"{d.name} has no lore"
             assert d.intro, f"{d.name} has no objective"
-            assert d.bandwidth_start == 100  # bandwidth refreshes every level
+            assert d.bandwidth_start == 200  # bandwidth refreshes every level
 
     def test_sector_difficulty_bands(self):
         from qgrid.lore import ZONES

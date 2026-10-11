@@ -25,7 +25,7 @@ from qgrid.levels import EMITTER_CHARS, LEVELS, WALL, parse_level
 from qgrid.solver import solve_level
 
 ZONE_SIZE = 8
-ZONE_OPT_MAX = {1: 45, 2: 60, 3: 65, 4: 72, 5: 80, 6: 95}
+ZONE_OPT_MAX = {1: 32, 2: 45, 3: 52, 4: 58, 5: 64, 6: 72}
 
 BOT_BUDGET_ATTEMPTS = 8
 BOT_TIME_LIMIT_S = 45.0

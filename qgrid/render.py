@@ -16,6 +16,7 @@ clear-to-end-of-line (\\033[K) per row to avoid flicker; full clears
 """
 
 from . import assets
+from .game import BANDWIDTH_MAX
 from .levels import EMITTER_CHARS, EXIT, SHARD, SPLITTER, WALL, LevelDef
 from .lore import CODEX, ZONES, rank_for
 
@@ -242,10 +243,10 @@ def _cell_block(game, x: int, y: int, gi: int, flash_on: bool, sx: int, sy: int)
 
 
 def _bandwidth_bar(bandwidth: int) -> str:
-    filled = max(0, min(20, bandwidth // 5))
-    if bandwidth >= 50:
+    filled = max(0, min(20, bandwidth // 10))
+    if bandwidth >= 100:
         color = WALL_BLUE
-    elif bandwidth >= 25:
+    elif bandwidth >= 50:
         color = YELLOW
     else:
         color = RED
@@ -757,7 +758,9 @@ def render_level_complete(
             width,
         ),
         "",
-        _center(_c(BEAM_GREEN, "BANDWIDTH REFRESHED TO 100%"), width),
+        _center(
+            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"), width,
+        ),
         "",
         _center(
             f"Next: NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width
@@ -784,7 +787,9 @@ def render_sector_clear(
         *_wrap_center(zone.clear_text, width, color=SHARD_YELLOW),
         "",
         _center(f"RUN TOTAL {_c(YELLOW, str(session_score))} PTS", width),
-        _center(_c(BEAM_GREEN, "BANDWIDTH REFRESHED TO 100%"), width),
+        _center(
+            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"), width,
+        ),
         "",
         _center(_blink(">>> PRESS ANY KEY TO DESCEND <<<", frame, BEAM_GREEN), width),
     ]

@@ -54,17 +54,19 @@ NAMES = [
 ]
 
 # Difficulty bands per sector (BFS-optimal action count range).
-ZONE_OPT_MIN = [12, 22, 24, 26, 30, 34]
-ZONE_OPT_MAX = [45, 60, 65, 72, 80, 95]
+# Tuned generous: with the 200% bandwidth budget, solutions leave big
+# headroom for human play (strikes, detours, shard runs).
+ZONE_OPT_MIN = [10, 18, 22, 25, 28, 30]
+ZONE_OPT_MAX = [32, 45, 52, 58, 64, 72]
 
 # Splitter prisms per level (by sector, by node-in-sector index 0..7).
 ZONE_SPLITTERS = [
     [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 1, 1, 1, 2],
-    [0, 0, 1, 1, 1, 1, 2, 2],
+    [0, 0, 0, 0, 1, 1, 1, 1],
+    [0, 0, 1, 1, 1, 1, 1, 2],
     [0, 0, 0, 1, 1, 1, 1, 1],
-    [1, 1, 2, 2, 2, 2, 3, 3],
-    [1, 1, 2, 2, 2, 2, 2, 3],
+    [1, 1, 1, 2, 2, 2, 2, 2],
+    [1, 1, 1, 2, 2, 2, 2, 2],
 ]
 
 # Teleport pad pairs per level (sector 4 + finale touches in sector 6).
@@ -322,7 +324,7 @@ def generate_level(index: int, rng: Random) -> dict:
     zone = (index - 1) // ZONE_SIZE + 1
     node = (index - 1) % ZONE_SIZE
     w, h = level_sizes(index)
-    n_mirrors = min(1 + (index - 1) // 2, 9)
+    n_mirrors = min(1 + (index - 1) // 2, 7)
     n_receptors = min(1 + (index - 1) // 5, 4)
     n_emitters = 1 if index < 14 else (2 if index < 41 else 3)
     n_walls = min(2 + index // 2, 9)
@@ -331,8 +333,8 @@ def generate_level(index: int, rng: Random) -> dict:
     n_sent, n_hunt, n_corr = zone_enemies(zone, node)
     opt_min, opt_max = ZONE_OPT_MIN[zone - 1], ZONE_OPT_MAX[zone - 1]
     if n_hunt:
-        # Hunter levels must stay short enough that a couple of ICE strikes
-        # (25% each) still fit inside the 100% bandwidth budget.
+        # Hunter levels must stay short enough that a couple of ICE
+        # strikes (25% each) still fit inside the 200% bandwidth budget.
         opt_max = min(opt_max, 48)
     cfg = {
         "w": w, "h": h,
@@ -395,7 +397,7 @@ def generate_level(index: int, rng: Random) -> dict:
             "rows": rows,
             "zone": zone,
             "par": opt,
-            "bandwidth_start": 100,
+            "bandwidth_start": 200,
             "bandwidth_floor": 0,
         }
     raise RuntimeError(f"could not generate level {index} after {attempts} attempts")
@@ -430,7 +432,7 @@ def main() -> int:
         f.write(f"Procedurally generated (seed {SEED}) and BFS-verified by\n")
         f.write("scripts/generate_levels.py. Regenerate with:\n\n")
         f.write("    python3 scripts/generate_levels.py\n\n")
-        f.write("48 nodes across 6 sectors. Bandwidth refreshes to 100%\n")
+        f.write("48 nodes across 6 sectors. Bandwidth refreshes to 200%\n")
         f.write('after every level. par = BFS-optimal action count.\n"""\n\n')
         f.write(f"TITLE_LORE = {TITLE_LORE!r}\n\n")
         f.write(f"GAMEOVER_LORE = {GAMEOVER_LORE!r}\n\n")

@@ -194,9 +194,12 @@ doesn't care about software.
 
 ### Bandwidth
 
-Every move or rotation consumes **1%**. **ICE strikes cost 25%**. Hit 0%
+You descend with a **200% bandwidth budget** per node (the run timer).
+Every move or rotation consumes **1%**; **ICE strikes cost 25%**. Hit 0%
 and the session severs (game over — progress is saved). Bandwidth
-refreshes to 100% after every node; `K` restores what you entered with.
+refreshes to 200% after every node; `K` restores what you entered with.
+With node solutions averaging ~35 optimal actions, even the hardest node
+leaves 3x headroom for detours, shard runs and daemon mistakes.
 
 ### ICE combat
 

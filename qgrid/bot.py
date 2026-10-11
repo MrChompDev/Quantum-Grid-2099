@@ -13,7 +13,7 @@ scripts/audit_levels.py (full-campaign audit).
 
 import time
 
-from qgrid.game import Game
+from qgrid.game import BANDWIDTH_MAX, Game
 from qgrid.physics import DIR4
 from qgrid.solver import solve_level, solve_state
 
@@ -49,7 +49,7 @@ def _shadow_step(game, sp, sm, act) -> tuple[tuple[int, int], dict]:
 
 def bot_play(index: int) -> tuple[bool, int, int]:
     """Play a node with live ICE. Returns (won, strikes, resets)."""
-    game = Game(index, 100)
+    game = Game(index, BANDWIDTH_MAX)
     if not game.daemons:  # no ICE: the BFS replay IS the full game
         path = solve_level(game.layout)
         assert path is not None, f"node {index + 1} unsolvable"

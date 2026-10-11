@@ -14,7 +14,7 @@ from .levels import (
 from .lore import GHOST_TRANSMISSIONS
 from .physics import DIR4, trace_beam
 
-BANDWIDTH_MAX = 100
+BANDWIDTH_MAX = 200
 BANDWIDTH_STEP = 1
 SHARD_SCORE = 250
 EFFICIENCY_BONUS = 20  # points per action saved under 2x par

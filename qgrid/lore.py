@@ -42,11 +42,11 @@ TRUE_ENDING_LORE = (
 VICTORY_LORE = STANDARD_ENDING_LORE
 
 RANKS: tuple[tuple[int, str, str], ...] = (
-    (250000, "LEGEND OF THE GRID", "1;35"),
-    (150000, "GHOST PROTOCOL", "1;36"),
-    (90000, "ICE BREAKER", "1;33"),
-    (40000, "CITY LIBERATOR", "1;32"),
-    (15000, "NETRUNNER", "1;34"),
+    (135000, "LEGEND OF THE GRID", "1;35"),
+    (100000, "GHOST PROTOCOL", "1;36"),
+    (65000, "ICE BREAKER", "1;33"),
+    (30000, "CITY LIBERATOR", "1;32"),
+    (10000, "NETRUNNER", "1;34"),
     (0, "SCRIPT KIDDIE", "90"),
 )
 

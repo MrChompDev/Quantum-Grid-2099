@@ -21,7 +21,7 @@ def mkmini(rows):
 
 @pytest.fixture
 def game1():
-    return Game(0, 100)
+    return Game(0, BANDWIDTH_MAX)
 
 
 def find_adjacent_passable(game):
@@ -76,18 +76,18 @@ class TestSolverPlaythrough:
         assert not game1.all_powered()  # level 1 starts unsolved
         apply_path(game1, path)
         assert game1.check_win()
-        assert game1.bandwidth == 100 - len(path)
+        assert game1.bandwidth == 200 - len(path)
 
     def test_all_levels_solver_wins(self):
         for i, defn in enumerate(LEVELS):
-            game = Game(i, 100)
+            game = Game(i, BANDWIDTH_MAX)
             game.daemons = []  # solver ignores ICE; replay the pure laser puzzle
             path = solve_level(game.layout)
             assert path is not None, f"{defn.name} unsolvable"
             apply_path(game, path)
             assert game.check_win(), f"{defn.name}: solver path did not win"
             assert game.bandwidth >= 0
-            assert game.bandwidth == 100 - len(path)
+            assert game.bandwidth == 200 - len(path)
 
 
 class TestInitialStates:
@@ -202,12 +202,12 @@ class TestBandwidth:
 class TestStartBandwidth:
     def test_refresh_after_each_level(self):
         for defn in LEVELS:
-            assert defn.bandwidth_start == 100
+            assert defn.bandwidth_start == 200
 
     def test_carryover_no_longer_applies(self):
         for defn in LEVELS:
-            assert start_bandwidth(defn, 0) == 100
-            assert start_bandwidth(defn, 55) == 100
+            assert start_bandwidth(defn, 0) == 200
+            assert start_bandwidth(defn, 55) == 200
 
 
 class TestTeleports:
