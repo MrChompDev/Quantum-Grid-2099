@@ -34,6 +34,7 @@ def default_save() -> dict:
         "shards": {},  # global node index (str) -> sorted list of shard indexes
         "codex": [],
         "endings": [],
+        "deaths": 0,
         "settings": dict(DEFAULT_SETTINGS),
     }
 

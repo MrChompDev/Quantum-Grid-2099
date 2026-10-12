@@ -347,7 +347,7 @@ class TestScoring:
         game = Game(0, 100, defn=defn, rng_seed=1)
         game.do_move(1, 0)  # collect shard, actions=1, bandwidth=99
         s = game.score()
-        expected = 99 * 10 + 1 * 250 + max(0, 20 - 1) * 20
+        expected = 99 * 10 + 1 * 250 + max(0, 20 - 1) * 20 + 400  # + flawless
         assert s == expected
 
     def test_finish_banks_shards(self):
@@ -508,3 +508,136 @@ class TestGameFxEvents:
         assert game.event == "teleport"
         assert game.flash.get((9, 2), 0) > 0  # destination pad flashing
         assert game.flash.get((2, 2), 0) > 0  # origin pad flashing
+
+
+class TestEmp:
+    def test_emp_stuns_daemons_in_radius(self):
+        defn = LevelDef(
+            name="emp",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#.....H......#",
+                    "#....@.......#",
+                    "#..........C.#",
+                    "#>..#.*..E...#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        kinds = {en["kind"]: en for en in game.daemons}
+        bw = game.bandwidth
+        actions = game.actions
+        assert game.do_emp() is True
+        # The hunter is within Chebyshev radius 2 of the probe at (5,3);
+        # the corruptor at (12,4) is not.
+        assert kinds["hunter"].get("stun", 0) > 0
+        assert kinds["corruptor"].get("stun", 0) == 0
+        assert game.bandwidth == bw - 10
+        assert game.actions == actions + 1
+        assert game.event == "emp"
+        assert game.emp_charges == 0
+
+    def test_emp_single_charge(self):
+        defn = LevelDef(
+            name="emp2",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..H.........#",
+                    "#....@.......#",
+                    "#............#",
+                    "#>..#.*..E...#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        assert game.do_emp() is True
+        bw = game.bandwidth
+        assert game.do_emp() is False
+        assert game.bandwidth == bw  # no second burst
+        assert "offline" in game.msg
+
+    def test_emp_resets_on_restart(self):
+        defn = LevelDef(
+            name="emp3",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..H.........#",
+                    "#....@.......#",
+                    "#............#",
+                    "#>..#.*..E...#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_emp()
+        game.restart()
+        assert game.emp_charges == 1
+
+
+class TestFlawless:
+    def test_flawless_bonus_applies(self):
+        defn = LevelDef(
+            name="fl",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..H.........#",
+                    "#....@.......#",
+                    "#............#",
+                    "#>..#.*..E...#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        clean = Game(0, 100, defn=defn, rng_seed=1)
+        clean.bandwidth = 100
+        assert clean.strikes == 0
+        bloodied = Game(0, 100, defn=defn, rng_seed=1)
+        bloodied.bandwidth = 100
+        bloodied.strikes = 1
+        assert clean.score() == bloodied.score() + 400
+
+    def test_last_killer_recorded(self):
+        defn = LevelDef(
+            name="kill",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#..@.H....E..#",
+                    "#............#",
+                    "#............#",
+                    "#>....*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        game.do_move(1, 0)  # step next to the hunter; it strikes
+        assert game.strikes == 1
+        assert game.last_killer == "hunter"

@@ -14,11 +14,11 @@ import os
 
 import asyncssh
 
-from . import audio
+from . import audio, daily as daily_mod, leaderboard
 from . import enemies as ice
 from . import save as save_mod
-from .game import DIR_VECTORS, Game, start_bandwidth
-from .levels import LEVELS
+from .game import BANDWIDTH_MAX, DIR_VECTORS, Game, start_bandwidth
+from .levels import LEVELS, LevelDef
 from .lore import (
     CODEX,
     CODEX_ON_NODE,
@@ -40,10 +40,12 @@ from .render import (
     ZONE_COUNT,
     ZONE_SIZE,
     render_codex,
+    render_daily_complete,
     render_cutscene,
     render_frame,
     render_game_over,
     render_goodbye,
+    render_leaderboard,
     render_level_complete,
     render_level_intro,
     render_node_select,
@@ -100,6 +102,7 @@ class Session:
             self.save["unlocked"] = len(LEVELS) - 1
         self.total_actions = 0
         self.session_score = 0
+        self.session_deaths = 0
         self.width, self.height = self._frame_size()
         # settings (persisted in the save; live-applied)
         st = self.save.get("settings")
@@ -209,6 +212,8 @@ class Session:
             return
         mapping = {
             "strike": "strike",
+            "emp": "emp",
+            "hint": "hint",
             "shard": "shard",
             "teleport": "teleport",
             "all_powered": "all_powered",
@@ -299,6 +304,13 @@ class Session:
         key = self._codex_for_node(index)
         if key:
             self.unlock_codex(key)
+        banked = sum(len(v) for v in self.save.get("shards", {}).values())
+        leaderboard.record(
+            self.username,
+            self.save.get("total_score", 0),
+            self.save.get("unlocked", 0),
+            banked,
+        )
         save_mod.store(self.username, self.save)
 
     # ------------------------------------------------------------------- flow
@@ -308,7 +320,13 @@ class Session:
             self.player.start()
             self._fx_task = asyncio.get_running_loop().create_task(self._fx_loop())
             frame = await self._show_animated(
-                lambda f: render_title(self.width, self.height, f, clear=f == 0)
+                lambda f: render_title(
+                    self.width,
+                    self.height,
+                    f,
+                    clear=f == 0,
+                    online=active_sessions(),
+                )
             )
             if frame is QUIT:
                 return
@@ -343,6 +361,8 @@ class Session:
                             self.width,
                             self.height,
                             f,
+                            session_deaths=self.session_deaths,
+                            username=self.username,
                         )
                     )
                     if ending is QUIT:
@@ -484,6 +504,17 @@ class Session:
         self.save["settings"] = dict(self.settings)
         save_mod.store(self.username, self.save)
 
+    async def _leaderboard_screen(self) -> None:
+        while True:
+            self.width, self.height = self._frame_size()
+            self.write(
+                CLEAR
+                + render_leaderboard(self.save, self.username, self.width, self.height)
+            )
+            key = await self.read_key()
+            if key is QUIT or key in ("q", "l", "c"):
+                return
+
     def _vfx(self) -> dict:
         return {
             "shake": self.settings.get("shake", "on") == "on",
@@ -510,6 +541,9 @@ class Session:
                 continue
             if key == "c":
                 await self._codex_screen()
+                continue
+            if key == "l":
+                await self._leaderboard_screen()
                 continue
             if key == "o":
                 self.player.sfx("menu")
@@ -553,6 +587,9 @@ class Session:
                 continue
             if key == "c":
                 await self._codex_screen()
+                continue
+            if key == "l":
+                await self._leaderboard_screen()
                 continue
             if key == "o":
                 self.player.sfx("menu")
@@ -647,6 +684,41 @@ class Session:
                         )
                     )
                     continue
+                if key == "e":
+                    fired = game.do_emp()
+                    if fired:
+                        self.total_actions += 1
+                        self.play_event(game.event)
+                        game.event = None
+                    self.write(
+                        render_frame(
+                            game,
+                            self.width,
+                            self.height,
+                            self.session_score,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
+                if key == "h":
+                    traced = game.do_hint()
+                    if traced:
+                        self.play_event(game.event)
+                        game.event = None
+                    self.write(
+                        render_frame(
+                            game,
+                            self.width,
+                            self.height,
+                            self.session_score,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
                 if key in DIR_VECTORS:
                     acted = game.do_move(*DIR_VECTORS[key]) == "ok"
                 elif key == "r":
@@ -705,6 +777,9 @@ class Session:
                     self._fx_game = None  # stop the idle VFX loop
                     self.player.set_song(None)
                     self.player.sfx("gameover")
+                    self.session_deaths += 1
+                    self.save["deaths"] = self.save.get("deaths", 0) + 1
+                    save_mod.store(self.username, self.save)
                     key = await self._show_animated(
                         lambda f: render_game_over(game, self.width, self.height, f)
                     )
@@ -739,6 +814,16 @@ def _total_shards_in_game() -> int:
     return total
 
 
+class _ActiveSessions:
+    """Process-wide count of live SSH game sessions."""
+
+    count = 0
+
+
+def active_sessions() -> int:
+    return _ActiveSessions.count
+
+
 async def handle_session(stdin, stdout, stderr, username: str = "guest") -> None:
     peer = ""
     try:
@@ -746,6 +831,7 @@ async def handle_session(stdin, stdout, stderr, username: str = "guest") -> None
     except Exception:  # noqa: BLE001, S110 - peername is best-effort only
         pass
     session = Session(stdin, stdout, peer, username)
+    _ActiveSessions.count += 1
     print(f"[QGRID] session opened: {session.username}@{session.peer}")
     try:
         await session.run()
@@ -754,6 +840,7 @@ async def handle_session(stdin, stdout, stderr, username: str = "guest") -> None
     except Exception as exc:  # noqa: BLE001 - keep the server alive no matter what
         print(f"[QGRID] session error: {exc!r}")
     finally:
+        _ActiveSessions.count = max(0, _ActiveSessions.count - 1)
         print(f"[QGRID] session closed: {session.username}@{session.peer}")
 
 

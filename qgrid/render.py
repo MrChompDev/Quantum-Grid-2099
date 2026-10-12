@@ -17,7 +17,7 @@ clear-to-end-of-line (\\033[K) per row to avoid flicker; full clears
 
 from . import assets
 from . import enemies as ice
-from .game import BANDWIDTH_MAX
+from .game import BANDWIDTH_MAX, FLAWLESS_BONUS
 from .levels import EMITTER_CHARS, EXIT, SHARD, SPLITTER, WALL, LevelDef
 from .lore import CODEX, ZONES, rank_for
 
@@ -265,9 +265,11 @@ def _header_lines(game, total_score: int = 0) -> list[str]:
         state = _c(RED, "[LOCKED]")
     shards = len(game.shards_taken)
     shards_total = len(game.layout.shards)
+    emp = _c(BEAM_GREEN, "READY") if game.emp_charges > 0 else _c(GRAY, "SPENT")
     line = (
         f"  BW [{_bandwidth_bar(game.bandwidth)}] {_c(WHITE, str(game.bandwidth))}%"
         f" {_c(GRAY, '|')} REC {_c(WHITE, f'{powered}/{total}')} {state}"
+        f" {_c(GRAY, '|')} EMP {emp}"
     )
     if shards_total:
         line += (
@@ -286,7 +288,9 @@ def _rule(width: int, color: str = WALL_BLUE) -> str:
 _CONTROLS_LINE = (
     f"  {_c(WHITE, 'WASD')} {_c(GRAY, 'Move')}"
     f" {_c(GRAY, '|')} {_c(WHITE, 'R')} {_c(GRAY, 'Rotate')}"
-    f" {_c(GRAY, '|')} {_c(WHITE, 'K')} {_c(GRAY, 'Restart')}"
+    f" {_c(GRAY, '|')} {_c(WHITE, 'E')} {_c(GRAY, 'EMP')}"
+    f" {_c(GRAY, '|')} {_c(WHITE, 'H')} {_c(GRAY, 'Hint')}"
+    f" {_c(GRAY, '|')} {_c(WHITE, 'K')} {_c(GRAY, 'Reset')}"
     f" {_c(GRAY, '|')} {_c(WHITE, 'M')} {_c(GRAY, 'Sound')}"
     f" {_c(GRAY, '|')} {_c(WHITE, 'Q')} {_c(GRAY, 'Quit')}"
 )
@@ -449,7 +453,11 @@ def _laser_lane(width: int, frame: int) -> str:
 
 
 def render_title(
-    width: int = MIN_W, height: int = MIN_H, frame: int = 0, clear: bool = True
+    width: int = MIN_W,
+    height: int = MIN_H,
+    frame: int = 0,
+    clear: bool = True,
+    online: int = 0,
 ) -> str:
     body = [
         *_indent(_colored_banner("QUANTUM GRID", CYAN)),
@@ -464,8 +472,13 @@ def render_title(
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
-        _center("Rotate mirrors, split beams, fold space, dodge the daemons.", width),
+        _center(
+            "Rotate mirrors, split beams, fold space, dodge the daemons.", width
+        ),
         _center(_c(GRAY, "\u266a no sound? run: python3 -m qgrid.audio_client"), width),
+        _center(_c(BEAM_GREEN, f"\u25c9 {online} RUNNER{'S' if online != 1 else ''} ON THE GRID"), width)
+        if online
+        else "",
         _center(_blink(">>> PRESS ANY KEY TO JACK IN <<<", frame, BEAM_GREEN), width),
     ]
     return _screen(body, width, height, clear)
@@ -481,12 +494,19 @@ def render_save_menu(
         "",
     ]
     if has_progress:
+        deaths = save.get("deaths", 0)
         body.extend(
             [
                 _center(
                     f"PROGRESS: {_c(WHITE, str(nodes) + '/48')} nodes"
                     f" {_c(GRAY, '|')} SCORE {_c(YELLOW, str(save.get('total_score', 0)))}"
                     f" {_c(GRAY, '|')} CODEX {_c(CYAN, str(len(save.get('codex', []))) + '/' + str(len(CODEX)))}",
+                    width,
+                ),
+                _center(
+                    _c(GRAY, "deaths on record:")
+                    + " "
+                    + (_c(RED, str(deaths)) if deaths else _c(BEAM_GREEN, "0")),
                     width,
                 ),
                 "",
@@ -544,7 +564,7 @@ def render_zone_select(
     body.extend(
         [
             "",
-            "  1-6: sector | ENTER: next node | C: codex | O: options | M: sound | Q: quit",
+            "  1-6 SECTOR | D DAILY | ENTER NEXT | C CODEX | L BOARD | O OPTIONS | Q QUIT",
         ]
     )
     return _screen(body, width, height)
@@ -612,7 +632,7 @@ def render_node_select(
     body.extend(
         [
             "",
-            "  1-8: node | ENTER: next uncleared | C: codex | O: options | Q: disconnect",
+            "  1-8 NODE | ENTER NEXT | C CODEX | L BOARD | O OPTIONS | Q QUIT",
         ]
     )
     return _screen(body, width, height)
@@ -664,6 +684,81 @@ def render_codex(
         [
             "",
             "  W/S: select | ENTER: read | C/Q: back",
+        ]
+    )
+    return _screen(body, width, height)
+
+
+def render_leaderboard(
+    save: dict,
+    username: str,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    """The server-wide hall of fame: best career scores across all runners."""
+    from . import leaderboard
+
+    entries = leaderboard.board()
+    body = [
+        _center(
+            _c(CYAN, "HALL OF FAME")
+            + _c(GRAY, " // ")
+            + _c(
+                WHITE,
+                f"{len(entries)} RUNNER{'S' if len(entries) != 1 else ''} ON THE BOARD",
+            ),
+            width,
+        ),
+        _center(
+            _c(GRAY, "best career score per netrunner - survive, bank, ascend"), width
+        ),
+        "",
+    ]
+    medals = ("\u2460", "\u2461", "\u2462")  # 1 2 3
+    shown = entries[:10]
+    if not shown:
+        body.extend(
+            [
+                _center(
+                    _c(GRAY, "The board is empty. Nobody has banked a score."), width
+                ),
+                _center(_c(GRAY, "Be the first ghost on the wire."), width),
+            ]
+        )
+    for i, entry in enumerate(shown):
+        who = str(entry.get("username", "?"))[:16]
+        score = entry.get("score", 0)
+        cleared = entry.get("cleared", 0)
+        shards = entry.get("shards", 0)
+        marker = medals[i] if i < len(medals) else f"{i + 1:2d}"
+        mine = who == username
+        line = (
+            f"  {marker} {_c(WHITE if not mine else CYAN, who.ljust(16))}"
+            f" {_c(YELLOW, f'{score:>6} PTS')}"
+            f" {_c(GRAY, '|')} {_c(WHITE, f'{cleared}/48')} nodes"
+            f" {_c(GRAY, '|')} {_c(SHARD_YELLOW, f'{shards} shards')}"
+        )
+        you = _c(BEAM_GREEN, "  \u2190 YOU") if mine else ""
+        body.append(_center(line + you, width))
+    if username not in {e.get("username") for e in shown} and username:
+        rank = leaderboard.rank_of(
+            username,
+            save.get("total_score", 0),
+            save.get("unlocked", 0),
+            sum(len(v) for v in save.get("shards", {}).values()),
+        )
+        body.append(
+            _center(
+                _c(GRAY, "\u00b7 \u00b7 \u00b7")
+                + f"  {_c(CYAN, f'#{rank} YOU')} "
+                + _c(YELLOW, f"{save.get('total_score', 0):>6} PTS"),
+                width,
+            )
+        )
+    body.extend(
+        [
+            "",
+            "  L/Q: back",
         ]
     )
     return _screen(body, width, height)
@@ -773,6 +868,7 @@ def render_level_complete(
             + _c(WHITE, f"RUN TOTAL {session_score}"),
             width,
         ),
+        *_flawless_line(game, width),
         "",
         _center(
             _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"),
@@ -782,6 +878,51 @@ def render_level_complete(
         _center(f"Next: NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO CONTINUE <<<"), width),
+    ]
+    return _screen(body, width, height, clear=False)
+
+
+def render_daily_complete(
+    game,
+    best: int,
+    rank: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
+    frame: int = 0,
+) -> str:
+    """Post-gauntlet screen: today's score, your best, your daily rank."""
+    par = game.defn.par or game.actions
+    body = [
+        "",
+        _center(_blink("*** GAUNTLET CLEARED ***", frame, BEAM_GREEN), width),
+        "",
+        _center(
+            _c(CYAN, game.defn.name) + _c(BEAM_GREEN, " // EXTRACTION COMPLETE"),
+            width,
+        ),
+        "",
+        _center(
+            f"ACTIONS {game.actions}"
+            f" {_c(GRAY, '(par ' + str(par) + ')')}"
+            f" {_c(GRAY, '|')} SHARDS {_c(SHARD_YELLOW, str(len(game.shards_taken)))}"
+            f" {_c(GRAY, '|')} STRIKES {_c(RED, str(game.strikes))}",
+            width,
+        ),
+        _center(
+            _c(YELLOW, f"+{game.score()} SCORE TODAY")
+            + _c(GRAY, " | ")
+            + _c(WHITE, f"BEST {best}"),
+            width,
+        ),
+        _center(_c(CYAN, f"TODAY'S BOARD: RANK #{rank}"), width),
+        "",
+        *_flawless_line(game, width),
+        _center(
+            _c(GRAY, "the board resets at midnight - come back tomorrow"),
+            width,
+        ),
+        "",
+        _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO RETURN <<<"), width),
     ]
     return _screen(body, width, height, clear=False)
 
@@ -812,22 +953,48 @@ def render_sector_clear(
     return _screen(body, width, height, clear=False)
 
 
+def _flawless_line(game, width: int) -> list[str]:
+    """The FLAWLESS bonus line, or nothing when ICE drew blood."""
+    if game.strikes or not game.layout.enemies:
+        return []
+    return [
+        _center(
+            _c(BEAM_GREEN, f"FLAWLESS - NO ICE STRIKES  +{FLAWLESS_BONUS} BONUS"),
+            width,
+        ),
+        "",
+    ]
+
+
 def render_game_over(
     game, width: int = MIN_W, height: int = MIN_H, frame: int = 0
 ) -> str:
     from .levels import GAMEOVER_LORE
 
+    killer_line = ""
+    if game.last_killer:
+        glyph = assets.ENEMY_GLYPHS.get(game.last_killer, "\u2716")
+        killer_line = _center(
+            _c(ICE_MAGENTA, f"SEVERED BY {game.last_killer.upper()} ICE {glyph}"),
+            width,
+        )
+    if game.level_index < 0:  # the daily gauntlet
+        fell_line = _center(f"You fell in the {game.defn.name}.", width)
+    else:
+        fell_line = _center(
+            f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.",
+            width,
+        )
     body = [
         "",
         _center(_blink("*** CONNECTION LOST ***", frame, EMITTER_RED), width),
         "",
         _center(_c(RED, "BANDWIDTH DEPLETED - SESSION TERMINATED"), width),
         "",
+        killer_line,
         *_wrap_center(GAMEOVER_LORE, width, color=GRAY),
         "",
-        _center(
-            f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width
-        ),
+        fell_line,
         _center(
             _c(
                 GRAY,
@@ -847,8 +1014,11 @@ def render_victory(
     width: int = MIN_W,
     height: int = MIN_H,
     frame: int = 0,
+    session_deaths: int = 0,
+    username: str = "",
 ) -> str:
     """Final campaign screen: rank + ending (true if enough shards banked)."""
+    from . import leaderboard
     from .lore import (
         SHARDS_FOR_TRUE_ENDING,
         STANDARD_ENDING_LORE,
@@ -863,6 +1033,17 @@ def render_victory(
         and banked >= SHARDS_FOR_TRUE_ENDING * total_shards_in_game
     )
     ending = TRUE_ENDING_LORE if true_end else STANDARD_ENDING_LORE
+    hall = leaderboard.rank_of(username, score, save.get("unlocked", 0), banked)
+    hall_line = (
+        _c(CYAN, f"HALL OF FAME RANK: #{hall}")
+        if username
+        else _c(GRAY, "leaderboard: anonymous session")
+    )
+    deaths = (
+        _c(RED, str(session_deaths))
+        if session_deaths
+        else _c(BEAM_GREEN, "ZERO - FLAWLESS DESCENT")
+    )
     body = [
         "",
         _center(_blink("*** MAINFRAME COMPROMISED ***", frame, BEAM_GREEN), width),
@@ -882,6 +1063,7 @@ def render_victory(
             _c(SHARD_YELLOW, f"DATASHARDS RECOVERED: {banked}/{total_shards_in_game}"),
             width,
         ),
+        _center(f"SESSION DEATHS: {deaths} {_c(GRAY, '|')} {hall_line}", width),
         "",
         *_wrap_center(ending, width, color=GRAY if not true_end else SHARD_YELLOW),
         "",

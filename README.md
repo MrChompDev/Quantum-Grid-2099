@@ -84,10 +84,12 @@ par (optimal action count) after extraction.
 | --- | --- |
 | `W A S D` / arrow keys | Move the light-beam probe |
 | `R` | Rotate an adjacent (or underfoot) mirror |
+| `E` | Fire the EMP burst (1 charge per node, 10% bandwidth) |
 | `K` | Restart the current node (restores entry bandwidth) |
 | `M` | Cycle sound mode: full → music → SFX → off |
 | `O` | Settings screen (from sector / node select) |
 | `C` | Open the codex (from sector / node select) |
+| `L` | Open the hall of fame (from sector / node select) |
 | `1`–`6` | Pick a sector |
 | `1`–`8` | Pick a node within a sector |
 | `ENTER` | Continue: next uncleared node |
@@ -200,11 +202,20 @@ doesn't care about software.
 ### Bandwidth
 
 You descend with a **200% bandwidth budget** per node (the run timer).
-Every move or rotation consumes **1%**; **ICE strikes cost 25%**. Hit 0%
-and the session severs (game over — progress is saved). Bandwidth
-refreshes to 200% after every node; `K` restores what you entered with.
-With node solutions averaging ~35 optimal actions, even the hardest node
-leaves 3x headroom for detours, shard runs and daemon mistakes.
+Every move or rotation consumes **1%**; **ICE strikes cost 25%**; an
+**EMP burst costs 10%**. Hit 0% and the session severs (game over —
+progress is saved). Bandwidth refreshes to 200% after every node; `K`
+restores what you entered with. With node solutions averaging ~35
+optimal actions, even the hardest node leaves 3x headroom for detours,
+shard runs and daemon mistakes.
+
+### The EMP burst
+
+Press `E` once per node: the probe discharges a pulse that **stuns every
+daemon within 2 cells for 4 ticks** — hunters mid-pounce, lancers
+mid-dash, a volt mid-pulse. It costs 10% bandwidth. The HUD shows
+`EMP READY` / `EMP SPENT`. Save it for the corridor you can't route
+around — a stunned daemon is also a door.
 
 ### ICE combat
 
@@ -231,10 +242,22 @@ Daemons act on every successful player action (turn-based):
 
 ### Scoring & endings
 
-Per node: `bandwidth×10 + shards×250 + efficiency bonus (par)`. Scores
-bank into a persistent run total; final rank ranges from SCRIPT KIDDIE to
-LEGEND OF THE GRID. Bank **90% of all datashards** across the campaign to
-unlock the true ending — the one where KAI comes home.
+Per node: `bandwidth×10 + shards×250 + efficiency bonus (par)`, plus a
+**+400 FLAWLESS bonus** for clearing an ICE node without a single
+strike. Scores bank into a persistent run total; final rank ranges from
+SCRIPT KIDDIE to LEGEND OF THE GRID. Bank **90% of all datashards**
+across the campaign to unlock the true ending — the one where KAI comes
+home.
+
+### Hall of fame
+
+Every node you clear posts your best career score, furthest node and
+shard count to the server-wide leaderboard — press `L` on the sector or
+node screen to see the standings, your row highlighted, your rank shown
+even when you're outside the top 10. The victory screen prints your
+final hall-of-fame rank and the session death count (a flawless descent
+is called out). One JSON file under the save directory; corrupt files
+degrade to an empty board, never a crashed session.
 
 ### Codex
 
@@ -262,6 +285,7 @@ qgrid/
   bot.py           adaptive live-ICE playthrough bot (danger-aware re-planning agent)
   render.py        adaptive full-terminal ANSI frames, 2x2 upscaling, VFX
   save.py          per-username JSON persistence
+  leaderboard.py   server-wide hall of fame (best career scores)
   server.py        asyncssh server, session state machine, raw input handling
 tests/             unit + solver + live-ICE bot + campaign verification tests
 scripts/

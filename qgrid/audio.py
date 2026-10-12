@@ -313,6 +313,8 @@ SFX: dict[str, list[tuple[float | None, int]]] = {
     "shard": parse_track(["E5", "G5", "B5", "E6"]),
     "teleport": parse_track(["C4", "F4", "A4", "C5"]),
     "strike": parse_track(["C4", "C3*2"]),
+    "emp": parse_track(["A5*2", "E5", "A4", "E4*2"]),
+    "hint": parse_track(["G5", "C6"]),
     "unlock": parse_track(["C5", "C5", "G5", "C6*2"]),
     "engage": parse_track(["E5", "A5"]),
     "gameover": parse_track(["E4*2", "C4*2", "A3*2", "F3*3"]),

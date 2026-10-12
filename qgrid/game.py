@@ -13,11 +13,21 @@ from .levels import (
 )
 from .lore import GHOST_TRANSMISSIONS
 from .physics import DIR4, trace_beam
+from .solver import solve_state
 
 BANDWIDTH_MAX = 200
 BANDWIDTH_STEP = 1
 SHARD_SCORE = 250
 EFFICIENCY_BONUS = 20  # points per action saved under 2x par
+FLAWLESS_BONUS = 400  # cleared a node without a single ICE strike
+
+EMP_COST = 10  # bandwidth per burst
+EMP_RADIUS = 2  # Chebyshev radius of the burst
+EMP_CHARGES = 1  # bursts per node
+
+HINT_COST = 5  # bandwidth to trace the next optimal step
+
+_DIR_NAMES = {(1, 0): "east", (-1, 0): "west", (0, 1): "south", (0, -1): "north"}
 
 DIR_VECTORS: dict[str, tuple[int, int]] = {
     "w": (0, -1),
@@ -48,6 +58,8 @@ class Game:
         self.game_over = False
         self.actions = 0
         self.strikes = 0
+        self.last_killer: str | None = None  # kind of the last striking daemon
+        self.emp_charges = EMP_CHARGES
         self.shards_taken: set[tuple[int, int]] = set()
         self.shards_banked: set[tuple[int, int]] = set()  # carried from prior runs
         self._rng_seed = rng_seed if rng_seed is not None else level_index * 7919 + 2099
@@ -161,6 +173,7 @@ class Game:
         self.bandwidth = max(0, self.bandwidth - ice.ICE_STRIKE_COST)
         self.strikes += 1
         for en, origin in strikes:
+            self.last_killer = en["kind"]
             en["stun"] = ice.DAEMON_STUN_TICKS
             ice.knock_back(en, origin, self.player, self)
         self.refresh()
@@ -211,6 +224,7 @@ class Game:
         for en in self.daemons:
             if en["pos"] != self.player or en.get("stun", 0) > 0:
                 continue
+            self.last_killer = en["kind"]
             en["stun"] = ice.DAEMON_STUN_TICKS
             push = (en["pos"][0] + dx, en["pos"][1] + dy)
             occupied = {o["pos"] for o in self.daemons if o is not en} | {self.player}
@@ -226,6 +240,75 @@ class Game:
             )
             self._fx("strike")
             return
+
+    def do_emp(self) -> bool:
+        """Fire the EMP burst: stun every live daemon within EMP_RADIUS
+        cells for DAEMON_STUN_TICKS. One charge per node, EMP_COST
+        bandwidth. Returns True if a burst went off."""
+        if self.emp_charges <= 0 or self.game_over:
+            self.msg = "EMP array offline - one burst per node."
+            return False
+        self.emp_charges -= 1
+        self.bandwidth = max(0, self.bandwidth - EMP_COST)
+        self.actions += 1
+        px, py = self.player
+        hit = 0
+        for en in self.daemons:
+            ex, ey = en["pos"]
+            if max(abs(ex - px), abs(ey - py)) <= EMP_RADIUS:
+                en["stun"] = max(en.get("stun", 0), ice.DAEMON_STUN_TICKS)
+                self.flash[(ex, ey)] = 4
+                hit += 1
+        self.event = "emp"
+        self.msg = (
+            f"EMP BURST! {hit} daemon{'s' if hit != 1 else ''} stunned - move!"
+            if hit
+            else "EMP BURST! No daemons in range."
+        )
+        self._tick()
+        return True
+
+    def do_hint(self) -> bool:
+        """Trace the next optimal action from this state: costs HINT_COST
+        bandwidth, flashes the step's target cell, changes nothing else
+        (the world does not tick on a trace). Returns True if a trace
+        was purchased."""
+        if self.bandwidth <= HINT_COST:
+            self.msg = "Not enough bandwidth to run a trace."
+            return False
+        path = solve_state(self.layout, self.player, dict(self.mirrors))
+        if path is None:
+            self.msg = "No solution thread from this tangle. Consider a reset (K)."
+            return False
+        act = path[0]
+        if act[0] == "m":
+            nx, ny = self.player[0] + act[1], self.player[1] + act[2]
+            if (nx, ny) in self.layout.pads:
+                nx, ny = self.layout.pads[(nx, ny)]
+                self.flash[(nx, ny)] = 4
+                self.msg = (
+                    f"TRACE: step {_DIR_NAMES[(act[1], act[2])]} - the pad folds you"
+                    f" across the room. (-{HINT_COST}%)"
+                )
+            else:
+                self.flash[(nx, ny)] = 4
+                self.msg = (
+                    f"TRACE: the thread runs {_DIR_NAMES[(act[1], act[2])]} - step"
+                    f" and see. (-{HINT_COST}%)"
+                )
+        else:
+            target = self.player if self.player in self.mirrors else None
+            if target is None:
+                for dx, dy in DIR4:
+                    if (self.player[0] + dx, self.player[1] + dy) in self.mirrors:
+                        target = (self.player[0] + dx, self.player[1] + dy)
+                        break
+            if target is not None:
+                self.flash[target] = 4
+            self.msg = f"TRACE: turn the glowing optic. (-{HINT_COST}%)"
+        self.bandwidth -= HINT_COST
+        self.event = "hint"
+        return True
 
     def do_rotate(self) -> bool:
         """Rotate an adjacent (or underfoot) mirror. Returns True on success."""
@@ -269,6 +352,8 @@ class Game:
         self.game_over = False
         self.actions = 0
         self.strikes = 0
+        self.last_killer = None
+        self.emp_charges = EMP_CHARGES
         self.shards_taken = set()
         self.flash = {}
         self.shake = 0
@@ -296,7 +381,13 @@ class Game:
     def score(self) -> int:
         par = self.defn.par or self.actions or 1
         efficiency = max(0, 2 * par - self.actions) * EFFICIENCY_BONUS
-        return self.bandwidth * 10 + len(self.shards_taken) * SHARD_SCORE + efficiency
+        flawless = FLAWLESS_BONUS if self.strikes == 0 else 0
+        return (
+            self.bandwidth * 10
+            + len(self.shards_taken) * SHARD_SCORE
+            + efficiency
+            + flawless
+        )
 
     def finish_level(self) -> int:
         """Refresh bandwidth to full and unlock the next node."""
