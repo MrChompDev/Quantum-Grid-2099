@@ -26,10 +26,16 @@ SHARD_GLYPH = "\u25c6"  # datashard (memory fragment of KAI)
 SENTINEL_GLYPH = "\u2716"  # patrol daemon
 HUNTER_GLYPH = "\u2620"  # pursuit daemon
 CORRUPTOR_GLYPH = "\u03a8"  # sabotage daemon
+WRAITH_GLYPH = "\u2248"  # phase daemon (walls mean nothing to it)
+LANCER_GLYPH = "\u2020"  # lane-charger daemon
+VOLT_GLYPH = "\u00a5"  # static pulse ward
 ENEMY_GLYPHS = {
     "sentinel": SENTINEL_GLYPH,
     "hunter": HUNTER_GLYPH,
     "corruptor": CORRUPTOR_GLYPH,
+    "wraith": WRAITH_GLYPH,
+    "lancer": LANCER_GLYPH,
+    "volt": VOLT_GLYPH,
 }
 
 BEAM_H = "\u2500"  # horizontal beam

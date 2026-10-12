@@ -79,27 +79,35 @@ ZONE_PADS = [
     [0, 1, 0, 0, 1, 0, 0, 1],
 ]
 
-# ICE daemons per level: (sentinels, hunters, corruptors).
-def zone_enemies(zone: int, node: int) -> tuple[int, int, int]:
+# ICE daemons per level: (sentinels, hunters, corruptors, wraiths,
+# lancers, volts). New daemons enter mid-campaign: WRAITH haunts the
+# Maze, LANCER patrols the Vault, VOLT guards the Singularity Core.
+def zone_enemies(zone: int, node: int) -> tuple[int, int, int, int, int, int]:
     if zone == 3:
         sent = 1 if node >= 2 else 0
         hunt = 1 if node in (3, 5, 7) else 0
-        return sent, hunt, 0
+        return sent, hunt, 0, 0, 0, 0
     if zone == 4:
         sent = 1 if node >= 2 else 0
         hunt = 1 if node >= 3 else 0
-        return sent, hunt, 0
+        wrth = 1 if node >= 5 else 0
+        return sent, hunt, 0, wrth, 0, 0
     if zone == 5:
         corr = 1 if node >= 2 else 0
         hunt = 1 if node >= 4 else 0
         sent = 1 if node >= 6 else 0
-        return sent, hunt, corr
+        wrth = 1 if node >= 3 else 0
+        lanc = 1 if node >= 4 else 0
+        return sent, hunt, corr, wrth, lanc, 0
     if zone == 6:
         corr = 1 if node >= 2 else 0
         hunt = 1 if node >= 1 else 0
         sent = 1 if node >= 3 else 0
-        return sent, hunt, corr
-    return 0, 0, 0
+        wrth = 1 if node >= 2 else 0
+        lanc = 1 if node >= 3 else 0
+        volt = 1 if node >= 4 else 0
+        return sent, hunt, corr, wrth, lanc, volt
+    return 0, 0, 0, 0, 0, 0
 
 
 def level_sizes(i: int) -> tuple[int, int]:
@@ -240,7 +248,14 @@ def _construct_full(rng, cfg):
     # ICE daemons
     taken = {player, exit_pos} | pad_set | set(shards)
     enemy_cells: list[tuple[tuple[int, int], str]] = []
-    kind_chars = ["S"] * cfg["n_sentinels"] + ["H"] * cfg["n_hunters"] + ["C"] * cfg["n_corruptors"]
+    kind_chars = (
+        ["S"] * cfg["n_sentinels"]
+        + ["H"] * cfg["n_hunters"]
+        + ["C"] * cfg["n_corruptors"]
+        + ["W"] * cfg["n_wraiths"]
+        + ["R"] * cfg["n_lancers"]
+        + ["V"] * cfg["n_volts"]
+    )
     for kch in kind_chars:
         options = [
             c for c in candidates
@@ -251,6 +266,12 @@ def _construct_full(rng, cfg):
                 if (c[0] + dx, c[1] + dy) in free_cells
                 and (c[0] + dx, c[1] + dy) not in taken
             ) >= 2
+            # corruptors never camp beside a mirror: they must travel to
+            # reach one, giving runners stability windows to work in
+            and (
+                kch != "C"
+                or all(max(abs(c[0] - m[0]), abs(c[1] - m[1])) >= 2 for m in mirrors)
+            )
         ]
         if not options:
             return None
@@ -330,11 +351,12 @@ def generate_level(index: int, rng: Random) -> dict:
     n_walls = min(2 + index // 2, 9)
     n_splitters = ZONE_SPLITTERS[zone - 1][node]
     n_pads = ZONE_PADS[zone - 1][node]
-    n_sent, n_hunt, n_corr = zone_enemies(zone, node)
+    n_sent, n_hunt, n_corr, n_wrth, n_lanc, n_volt = zone_enemies(zone, node)
     opt_min, opt_max = ZONE_OPT_MIN[zone - 1], ZONE_OPT_MAX[zone - 1]
-    if n_hunt:
-        # Hunter levels must stay short enough that a couple of ICE
-        # strikes (25% each) still fit inside the 200% bandwidth budget.
+    if n_hunt or n_wrth or n_lanc or n_volt:
+        # Hunter/wraith/lancer/volt levels must stay short enough that a
+        # couple of ICE strikes (25% each) still fit inside the 200%
+        # bandwidth budget.
         opt_max = min(opt_max, 48)
     cfg = {
         "w": w, "h": h,
@@ -342,6 +364,7 @@ def generate_level(index: int, rng: Random) -> dict:
         "n_emitters": n_emitters, "n_walls": n_walls,
         "n_splitters": n_splitters, "n_pads": n_pads,
         "n_sentinels": n_sent, "n_hunters": n_hunt, "n_corruptors": n_corr,
+        "n_wraiths": n_wrth, "n_lancers": n_lanc, "n_volts": n_volt,
     }
 
     attempts = 0
@@ -373,7 +396,9 @@ def generate_level(index: int, rng: Random) -> dict:
             continue
         if len(layout.pads) // 2 < n_pads:
             continue
-        if len(layout.enemies) < n_sent + n_hunt + n_corr:
+        if len(layout.enemies) < (
+            n_sent + n_hunt + n_corr + n_wrth + n_lanc + n_volt
+        ):
             continue
         intro_bits = [
             f"Sector {zone:02d}, node {node + 1}.",

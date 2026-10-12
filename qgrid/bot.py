@@ -1,11 +1,12 @@
 """Adaptive playthrough bot for Quantum Grid 2099.
 
 The BFS solver models the pure laser puzzle; this bot plays the REAL
-game with live ICE: it executes BFS routes, keeps a shadow state that
-mirrors the plan, and re-plans the instant reality diverges (corruptor
-mirror flips, ICE strikes, blocked moves). It restarts the node only
-after a game over or an unsolvable state - the recovery a human player
-has with K.
+game with live ICE: it plans routes that dodge daemon danger zones
+(one-tick threat maps per kind), re-plans the instant reality diverges
+(corruptor mirror flips, ICE strikes, a step that would enter fresh
+danger, blocked moves), and falls back to the pure puzzle route only
+when no safe route exists. It restarts the node only after a game over
+or an unsolvable state - the recovery a human player has with K.
 
 Used by tests/test_ice_playability.py (the winnability guarantee) and
 scripts/audit_levels.py (full-campaign audit).
@@ -13,6 +14,7 @@ scripts/audit_levels.py (full-campaign audit).
 
 import time
 
+from qgrid import enemies as ice
 from qgrid.game import BANDWIDTH_MAX, Game
 from qgrid.physics import DIR4
 from qgrid.solver import solve_level, solve_state
@@ -47,6 +49,41 @@ def _shadow_step(game, sp, sm, act) -> tuple[tuple[int, int], dict]:
     return sp, sm
 
 
+def _danger_cells(game) -> set[tuple[int, int]]:
+    """One-tick threat map: every cell a live daemon could strike this
+    tick (its cell, its reach, or its pulse field)."""
+    danger: set[tuple[int, int]] = set()
+    layout = game.layout
+    for en in game.daemons:
+        if en.get("stun", 0) > 0:
+            continue
+        px, py = en["pos"]
+        danger.add((px, py))
+        kind = en["kind"]
+        if kind == "volt":
+            danger.update(ice._volt_field(layout, en, set()))
+        elif kind == "sentinel":
+            dx, dy = en["dir"]
+            danger.update({(px + dx, py + dy), (px - dx, py - dy)})
+        elif kind == "lancer":
+            danger.update((px + dx, py + dy) for dx, dy in DIR4)
+            dx, dy = en["dir"]
+            danger.update({(px + dx, py + dy), (px + 2 * dx, py + 2 * dy)})
+        else:  # hunter, corruptor, wraith: a step in any direction
+            danger.update((px + dx, py + dy) for dx, dy in DIR4)
+    return danger
+
+
+def _safe_plan(game) -> tuple | None:
+    """Plan around daemon danger zones; fall back to the pure route."""
+    path = solve_state(
+        game.layout, game.player, dict(game.mirrors), blocked=_danger_cells(game)
+    )
+    if path is None:
+        path = solve_state(game.layout, game.player, dict(game.mirrors))
+    return path
+
+
 def bot_play(index: int) -> tuple[bool, int, int]:
     """Play a node with live ICE. Returns (won, strikes, resets)."""
     game = Game(index, BANDWIDTH_MAX)
@@ -71,7 +108,7 @@ def bot_play(index: int) -> tuple[bool, int, int]:
             game.restart()
             resets += 1
             continue
-        path = solve_state(game.layout, game.player, dict(game.mirrors))
+        path = _safe_plan(game)
         if path is None:
             game.restart()
             resets += 1
@@ -80,6 +117,14 @@ def bot_play(index: int) -> tuple[bool, int, int]:
         while path and not game.game_over and not game.check_win():
             if time.monotonic() - start > TIME_LIMIT_S:
                 break
+            # Re-plan if the next step would walk into fresh danger.
+            nxt_act = path[0]
+            if nxt_act[0] == "m":
+                nxt = (game.player[0] + nxt_act[1], game.player[1] + nxt_act[2])
+                if nxt in game.layout.pads:
+                    nxt = game.layout.pads[nxt]
+                if nxt in _danger_cells(game):
+                    break  # world moved under us: re-plan
             act = path[0]
             sp, sm = _shadow_step(game, sp, sm, act)
             if act[0] == "m":

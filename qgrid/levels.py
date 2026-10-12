@@ -15,6 +15,9 @@ Grid size varies per level (bigger nodes deeper in the campaign):
     S  SENTINEL ICE spawn (patrol daemon)
     H  HUNTER ICE spawn (pursuit daemon)
     C  CORRUPTOR ICE spawn (sabotage daemon)
+    W  WRAITH ICE spawn (phase daemon - ignores walls)
+    R  LANCER ICE spawn (lane-charger daemon)
+    V  VOLT ICE spawn (static pulse ward)
     E  extraction node
 
 The 48 campaign nodes across 6 sectors are procedurally generated and
@@ -35,11 +38,19 @@ SPLITTER = "+"
 PAD_A = "T"
 PAD_B = "U"
 SHARD = "$"
-ENEMY_SPAWNS = ("S", "H", "C")  # sentinel, hunter, corruptor
+ENEMY_SPAWNS = ("S", "H", "C", "W", "R", "V")  # sentinel, hunter, corruptor,
+# wraith, lancer, volt
 EXIT = "E"
 EMITTER_CHARS = (">", "<", "^", "v")
 
-ENEMY_KIND_BY_CHAR = {"S": "sentinel", "H": "hunter", "C": "corruptor"}
+ENEMY_KIND_BY_CHAR = {
+    "S": "sentinel",
+    "H": "hunter",
+    "C": "corruptor",
+    "W": "wraith",
+    "R": "lancer",
+    "V": "volt",
+}
 
 __all__ = [
     "EMITTER_CHARS",

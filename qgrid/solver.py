@@ -28,12 +28,19 @@ def solve_level(layout) -> Action | None:
 
 
 def solve_state(
-    layout, player: tuple[int, int], mirrors: dict[tuple[int, int], str]
+    layout,
+    player: tuple[int, int],
+    mirrors: dict[tuple[int, int], str],
+    blocked: set[tuple[int, int]] | None = None,
 ) -> Action | None:
     """BFS from an arbitrary (player, mirror) state - used by adaptive
-    playthrough bots that must re-plan around live ICE."""
+    playthrough bots that must re-plan around live ICE.
+
+    `blocked` marks cells the path must avoid (daemon danger zones); the
+    pure puzzle ignores them. Pass None for the plain puzzle route."""
     receptors = set(layout.receptors)
     pads = layout.pads
+    blocked = blocked or set()
     start = (player, frozenset(mirrors.items()))
     queue: deque[tuple[tuple[tuple[int, int], frozenset], tuple]] = deque([(start, ())])
     visited = {start}
@@ -46,6 +53,8 @@ def solve_state(
         for dx, dy in DIR4:
             nxt = (pos[0] + dx, pos[1] + dy)
             if not (0 <= nxt[0] < layout.width and 0 <= nxt[1] < layout.height):
+                continue
+            if nxt in blocked:
                 continue
             terrain = layout.rows[nxt[1]][nxt[0]]
             if terrain == WALL or terrain in EMITTER_CHARS:

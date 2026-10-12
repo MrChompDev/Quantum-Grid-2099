@@ -16,6 +16,7 @@ clear-to-end-of-line (\\033[K) per row to avoid flicker; full clears
 """
 
 from . import assets
+from . import enemies as ice
 from .game import BANDWIDTH_MAX
 from .levels import EMITTER_CHARS, EXIT, SHARD, SPLITTER, WALL, LevelDef
 from .lore import CODEX, ZONES, rank_for
@@ -361,12 +362,7 @@ def render_frame(
     if game.shake > 0 and shake_on:
         indent = max(0, indent + SHAKE_OFFSETS[frame % len(SHAKE_OFFSETS)])
     rule_color = (RED if game.shake > 1 else WALL_BLUE) if (game.shake > 1 and shake_on) else WALL_BLUE
-    danger = any(
-        en["kind"] == "hunter"
-        and en.get("stun", 0) <= 0
-        and abs(en["pos"][0] - game.player[0]) + abs(en["pos"][1] - game.player[1]) <= 6
-        for en in game.daemons
-    )
+    danger = ice.threat_near(game)
 
     # chrome: rule + 2 HUD lines + grid + status + controls (footer pinned)
     chrome = 5
@@ -490,7 +486,7 @@ def render_save_menu(
                 _center(
                     f"PROGRESS: {_c(WHITE, str(nodes) + '/48')} nodes"
                     f" {_c(GRAY, '|')} SCORE {_c(YELLOW, str(save.get('total_score', 0)))}"
-                    f" {_c(GRAY, '|')} CODEX {_c(CYAN, str(len(save.get('codex', []))) + '/16')}",
+                    f" {_c(GRAY, '|')} CODEX {_c(CYAN, str(len(save.get('codex', []))) + '/' + str(len(CODEX)))}",
                     width,
                 ),
                 "",
@@ -676,6 +672,9 @@ def _threat_summary(defn: LevelDef) -> str:
         "sentinel": "SENTINEL",
         "hunter": "HUNTER",
         "corruptor": "CORRUPTOR",
+        "wraith": "WRAITH",
+        "lancer": "LANCER",
+        "volt": "VOLT",
     }
     parts = [f"{count}x {names[kind]}" for kind, count in sorted(counts.items())]
     return ", ".join(parts) if parts else "none detected"

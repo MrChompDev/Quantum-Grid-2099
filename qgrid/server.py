@@ -15,6 +15,7 @@ import os
 import asyncssh
 
 from . import audio
+from . import enemies as ice
 from . import save as save_mod
 from .game import DIR_VECTORS, Game, start_bandwidth
 from .levels import LEVELS
@@ -223,14 +224,7 @@ class Session:
                 continue
             self.frame_no += 1
             game.decay_fx()
-            danger = any(
-                en["kind"] == "hunter"
-                and en.get("stun", 0) <= 0
-                and abs(en["pos"][0] - game.player[0])
-                + abs(en["pos"][1] - game.player[1])
-                <= 6
-                for en in game.daemons
-            )
+            danger = ice.threat_near(game)
             self.player.set_song("danger" if danger else "explore")
             self.width, self.height = self._frame_size()
             self.write(

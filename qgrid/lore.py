@@ -381,6 +381,13 @@ CODEX: tuple[tuple[str, str, str], ...] = (
         "just can't ignore it."),
     ),
     (
+        "wraith",
+        "WRAITH ICE",
+        ("Phase daemon, Maze-born. Slides through walls, mirrors and hardware "
+        "alike, drifting toward a probe within eight cells - one step every "
+        "third tick, patient as fog. Cover means nothing. Keep moving."),
+    ),
+    (
         "maze",
         "THE MAZE",
         ("Unmapped catacombs beneath the Foundry. Corridors rewrite themselves; "
@@ -392,6 +399,22 @@ CODEX: tuple[tuple[str, str, str], ...] = (
         ("Sabotage daemon. Reaches into the optical layer and flips your mirrors "
         "while you work. The Vault's answer to runners who solve nodes too "
         "cleanly."),
+    ),
+    (
+        "lancer",
+        "LANCER ICE",
+        ("Charge daemon, Vault-grade. Locks onto any probe sharing its row or "
+        "column with clear sight and dashes two cells per tick down the lane. "
+        "Step off the lane and it slows to a crawl - never share a corridor "
+        "with a lance."),
+    ),
+    (
+        "volt",
+        "VOLT ICE",
+        ("Static ward. Never moves. Every other tick it pulses a charge field "
+        "into the four open cells around it - stand in the field and it costs "
+        "25% bandwidth. The pulse stuns the ward for four ticks afterward: "
+        "that's your window to work the room."),
     ),
     (
         "kai",
@@ -429,10 +452,13 @@ CODEX_ON_ZONE = {1: "mirage", 2: "vex", 3: "foundry", 4: "maze", 5: "oracle", 6:
 CODEX_ON_NODE = {
     13: "splitter",  # first prism node (sector 2, node 5)
     19: "sentinel",  # first sentinel node (sector 3)
-    27: "teleport",  # first teleport node (sector 4)
-    29: "hunter",    # first hunter node (sector 4, node 5)
+    26: "teleport",  # first teleport node (sector 4, node 2)
+    28: "hunter",    # first hunter node (sector 4, node 4)
+    30: "wraith",    # first wraith node (sector 4, node 6)
     35: "corruptor", # first corruptor node (sector 5, node 3)
+    37: "lancer",    # first lancer node (sector 5, node 5)
     39: "kai",       # the ledger line (sector 5, node 7)
+    45: "volt",      # first volt node (sector 6, node 5)
 }
 CODEX_ON_SHARDS = {10: "shards"}
 
