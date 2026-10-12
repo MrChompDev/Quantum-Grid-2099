@@ -137,7 +137,7 @@ async def main() -> int:
             c.send("q")
 
             c.send("\r")  # ENTER on sector select -> node select (sector 1)
-            await c.read_until("1-8: node")
+            await c.read_until("1-8 NODE")
             c.send("\r")  # ENTER -> first uncleared node (NODE 01)
             await c.read_until("PRESS ANY KEY TO ENGAGE")
             c.send(" ")
@@ -147,7 +147,7 @@ async def main() -> int:
             print("NODE 01 - FIRST LIGHT: cleared via SSH", flush=True)
 
             c.send(" ")  # dismiss complete -> node select
-            await c.read_until("1-8: node")
+            await c.read_until("1-8 NODE")
             c.send("q")  # q disconnects from anywhere
             await c.read_until("CONNECTION TERMINATED", timeout=5)
             print("clean disconnect verified", flush=True)

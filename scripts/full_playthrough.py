@@ -137,7 +137,7 @@ async def main() -> int:
             c.send("x")  # skip the opening cutscene
             await c.read_until("SECTOR ACCESS")
             c.send("\r")  # sector select -> node select (sector 1)
-            await c.read_until("1-8: node")
+            await c.read_until("1-8 NODE")
             print("connected; starting full campaign...", flush=True)
 
             for i, defn in enumerate(LEVELS):
@@ -172,7 +172,7 @@ async def main() -> int:
                         c.send(" ")
                         await c.read_until("SECTOR ACCESS")
                         c.send("\r")  # jump into the next sector
-                    await c.read_until("1-8: node")
+                    await c.read_until("1-8 NODE")
 
             c.send(" ")  # dismiss the victory screen -> session ends
             await c.read_until("CONNECTION TERMINATED", timeout=5)
