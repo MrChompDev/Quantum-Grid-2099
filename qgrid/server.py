@@ -556,8 +556,15 @@ class Session:
         scene = EVENT_CUTSCENES.get(key)
         if scene is None:
             return
-        self._fx_game = None  # freeze the idle loop during the scene
-        result = await self._play_cutscene(scene)
+        # Freeze the idle loop during the scene, then restore whatever was
+        # live before it - a mid-node milestone (first strike, first EMP)
+        # must not kill the shimmer/danger-music loop for the whole node.
+        live_game = self._fx_game
+        self._fx_game = None
+        try:
+            result = await self._play_cutscene(scene)
+        finally:
+            self._fx_game = live_game
         self.player.sfx("menu")
         if result == "quit":
             raise QuitSignal()

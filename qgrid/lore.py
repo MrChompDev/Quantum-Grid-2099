@@ -753,7 +753,11 @@ def evaluate_records(save: dict, event: str, game=None) -> list[str]:
 
     if event == "win" and game is not None:
         grant("first_descent", unlocked >= 1)
-        grant("clean_room", game.strikes == 0)
+        grant(
+            "clean_room",
+            game.strikes == 0
+            and bool(getattr(getattr(game, "layout", None), "enemies", ())),
+        )
         grant("survivor", game.strikes >= 3)
         grant("shard_10", banked >= 10)
         grant("deep_runner", unlocked >= 24)

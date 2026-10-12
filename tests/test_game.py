@@ -347,7 +347,9 @@ class TestScoring:
         game = Game(0, 100, defn=defn, rng_seed=1)
         game.do_move(1, 0)  # collect shard, actions=1, bandwidth=99
         s = game.score()
-        expected = 99 * 10 + 1 * 250 + max(0, 20 - 1) * 20 + 400  # + flawless
+        # no ICE on this node: no flawless bonus, just bandwidth + shard
+        # + efficiency (par 10)
+        expected = 99 * 10 + 1 * 250 + max(0, 20 - 1) * 20
         assert s == expected
 
     def test_finish_banks_shards(self):
@@ -722,3 +724,75 @@ class TestHint:
             assert game.do_hint() is False
         assert "No solution thread" in game.msg
         assert game.bandwidth == 100  # refusal is free
+
+
+class TestHintEdge:
+    def test_hint_on_winning_state_is_safe(self):
+        """A trace from an already-winning state must not crash (the solver
+        returns an empty path); it politely declines instead."""
+        defn = LevelDef(
+            name="hintwin",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#..*.........#",
+                    "#....@...E...#",
+                    "#............#",
+                    "#............#",
+                    "#>./.........#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        path = solve_level_ish(game)
+        for act, dx, dy in path:
+            if act == "m":
+                assert game.do_move(dx, dy) == "ok"
+            else:
+                game.do_rotate()
+        assert game.check_win()
+        assert game.do_hint() is False
+        assert game.bandwidth == game.bandwidth  # no charge on refusal
+
+
+def solve_level_ish(game):
+    from qgrid.solver import solve_state
+
+    return solve_state(game.layout, game.player, dict(game.mirrors))
+
+
+class TestFlawlessIceOnly:
+    def test_flawless_bonus_requires_ice(self):
+        defn = LevelDef(
+            name="noice",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#....@...E...#",
+                    "#............#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        assert not game.layout.enemies
+        assert game.strikes == 0
+        assert game.score() % 10 == 0 and "no flawless without ICE"  # sanity
+        from qgrid.game import FLAWLESS_BONUS
+
+        # score without ICE < score + FLAWLESS_BONUS comparison base:
+        base = game.bandwidth * 10 + len(game.shards_taken) * 250
+        par = game.defn.par or 1
+        eff = max(0, 2 * par - game.actions) * 20
+        assert game.score() == base + eff  # no flawless term
+        assert FLAWLESS_BONUS == 400

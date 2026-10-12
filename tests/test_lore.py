@@ -105,12 +105,13 @@ class TestRecords:
         assert "survivor" not in earned
 
     def test_flawless_and_survivor(self):
-        game = type("G", (), {"strikes": 0})()
+        ice_layout = type("L", (), {"enemies": (("x", "hunter"),)})()
+        game = type("G", (), {"strikes": 0, "layout": ice_layout})()
         earned = evaluate_records(
             {"records": [], "unlocked": 3, "shards": {}}, "win", game
         )
         assert "clean_room" in earned and "survivor" not in earned
-        game = type("G", (), {"strikes": 3})()
+        game = type("G", (), {"strikes": 3, "layout": ice_layout})()
         earned = evaluate_records(
             {"records": [], "unlocked": 3, "shards": {}}, "win", game
         )
@@ -145,3 +146,43 @@ class TestRecords:
         assert "3/10 INSCRIPTIONS" in frame
         assert "FIRST DESCENT" in frame
         assert "????????????" in frame  # locked titles hidden
+
+    def test_flawless_needs_ice(self):
+        empty_layout = type("L", (), {"enemies": ()})()
+        game = type("G", (), {"strikes": 0, "layout": empty_layout})()
+        earned = evaluate_records(
+            {"records": [], "unlocked": 3, "shards": {}}, "win", game
+        )
+        assert "clean_room" not in earned
+
+
+class TestEventCutsceneInfra:
+    def test_event_cutscene_restores_live_fx_game(self, monkeypatch):
+        """A milestone cutscene mid-node must not kill the idle FX loop."""
+        import asyncio
+        import io
+
+        from qgrid import save as save_mod
+        from qgrid.server import Session
+
+        class FakeOut:
+            def write(self, s):
+                pass
+
+        class Sentinel:
+            pass
+
+        monkeypatch.setattr(save_mod, "store", lambda *a, **k: None)
+        sess = Session(io.BytesIO(b"x"), FakeOut(), "test", "tester")
+
+        async def fake_cutscene(scene):
+            return "done"
+
+        sess._play_cutscene = fake_cutscene
+        sentinel = Sentinel()
+        sess._fx_game = sentinel
+        asyncio.run(sess._event_cutscene("first_death"))
+        assert sess._fx_game is sentinel, "fx loop not restored after cutscene"
+        assert "first_death" in sess.save["scenes_seen"]
+        # second call: already seen, no-op
+        asyncio.run(sess._event_cutscene("first_death"))

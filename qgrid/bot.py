@@ -88,9 +88,16 @@ def _safe_plan(game) -> tuple[bool, tuple | None]:
     return False, solve_state(game.layout, game.player, dict(game.mirrors))
 
 
-def bot_play(index: int) -> tuple[bool, int, int]:
-    """Play a node with live ICE. Returns (won, strikes, resets)."""
-    game = Game(index, BANDWIDTH_MAX)
+def bot_play(index: int, defn=None) -> tuple[bool, int, int]:
+    """Play a node with live ICE. Returns (won, strikes, resets).
+
+    `defn` overrides the campaign level (used by the daily gauntlet
+    tests to prove a fresh gauntlet layout is winnable)."""
+    game = Game(
+        index if defn is None else -1,
+        BANDWIDTH_MAX,
+        defn=defn,
+    )
     if not game.daemons:  # no ICE: the BFS replay IS the full game
         path = solve_level(game.layout)
         assert path is not None, f"node {index + 1} unsolvable"

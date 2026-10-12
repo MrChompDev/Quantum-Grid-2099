@@ -282,6 +282,9 @@ class Game:
         if path is None:
             self.msg = "No solution thread from this tangle. Consider a reset (K)."
             return False
+        if not path:  # already standing on a win state: nothing to trace
+            self.msg = "Extraction node live - step out and claim it."
+            return False
         act = path[0]
         if act[0] == "m":
             nx, ny = self.player[0] + act[1], self.player[1] + act[2]
@@ -383,7 +386,8 @@ class Game:
     def score(self) -> int:
         par = self.defn.par or self.actions or 1
         efficiency = max(0, 2 * par - self.actions) * EFFICIENCY_BONUS
-        flawless = FLAWLESS_BONUS if self.strikes == 0 else 0
+        # Flawless means something: only nodes that actually carry ICE.
+        flawless = FLAWLESS_BONUS if self.strikes == 0 and self.layout.enemies else 0
         return (
             self.bandwidth * 10
             + len(self.shards_taken) * SHARD_SCORE
