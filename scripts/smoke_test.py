@@ -41,9 +41,7 @@ def level_keys(index: int) -> str:
     defn = LEVELS[index]
     path = solve_level(parse_level(defn.rows, defn.name))
     assert path is not None, f"{defn.name} unsolvable"
-    return "".join(
-        KEY_FOR_DIR[(dx, dy)] if act == "m" else "r" for act, dx, dy in path
-    )
+    return "".join(KEY_FOR_DIR[(dx, dy)] if act == "m" else "r" for act, dx, dy in path)
 
 
 class Client:

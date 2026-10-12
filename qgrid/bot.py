@@ -2,11 +2,12 @@
 
 The BFS solver models the pure laser puzzle; this bot plays the REAL
 game with live ICE: it plans routes that dodge daemon danger zones
-(one-tick threat maps per kind), re-plans the instant reality diverges
-(corruptor mirror flips, ICE strikes, a step that would enter fresh
-danger, blocked moves), and falls back to the pure puzzle route only
-when no safe route exists. It restarts the node only after a game over
-or an unsolvable state - the recovery a human player has with K.
+(one-tick threat maps per kind) and re-plans the instant reality
+diverges (corruptor mirror flips, ICE strikes, blocked moves). When no
+safe route exists it punches through - a strike stuns the daemon and
+reopens the lane, which is usually cheaper than dancing around it. It
+restarts the node only after a game over or an unsolvable state - the
+recovery a human player has with K.
 
 Used by tests/test_ice_playability.py (the winnability guarantee) and
 scripts/audit_levels.py (full-campaign audit).
@@ -74,14 +75,17 @@ def _danger_cells(game) -> set[tuple[int, int]]:
     return danger
 
 
-def _safe_plan(game) -> tuple | None:
-    """Plan around daemon danger zones; fall back to the pure route."""
+def _safe_plan(game) -> tuple[bool, tuple | None]:
+    """Plan around daemon danger zones. Returns (safe, path): safe means
+    the route avoids every danger cell; otherwise the pure puzzle route
+    is returned and the bot must punch through (a strike stuns the
+    daemon and reopens the lane)."""
     path = solve_state(
         game.layout, game.player, dict(game.mirrors), blocked=_danger_cells(game)
     )
-    if path is None:
-        path = solve_state(game.layout, game.player, dict(game.mirrors))
-    return path
+    if path is not None:
+        return True, path
+    return False, solve_state(game.layout, game.player, dict(game.mirrors))
 
 
 def bot_play(index: int) -> tuple[bool, int, int]:
@@ -108,7 +112,7 @@ def bot_play(index: int) -> tuple[bool, int, int]:
             game.restart()
             resets += 1
             continue
-        path = _safe_plan(game)
+        _, path = _safe_plan(game)
         if path is None:
             game.restart()
             resets += 1
@@ -117,14 +121,6 @@ def bot_play(index: int) -> tuple[bool, int, int]:
         while path and not game.game_over and not game.check_win():
             if time.monotonic() - start > TIME_LIMIT_S:
                 break
-            # Re-plan if the next step would walk into fresh danger.
-            nxt_act = path[0]
-            if nxt_act[0] == "m":
-                nxt = (game.player[0] + nxt_act[1], game.player[1] + nxt_act[2])
-                if nxt in game.layout.pads:
-                    nxt = game.layout.pads[nxt]
-                if nxt in _danger_cells(game):
-                    break  # world moved under us: re-plan
             act = path[0]
             sp, sm = _shadow_step(game, sp, sm, act)
             if act[0] == "m":

@@ -110,8 +110,15 @@ def test_pty_bridge_forwards_output_and_strips_markers():
     )
     proc = subprocess.Popen(
         [
-            sys.executable, "-u", "-m", "qgrid.audio_client", "--",
-            sys.executable, "-u", "-c", fake,
+            sys.executable,
+            "-u",
+            "-m",
+            "qgrid.audio_client",
+            "--",
+            sys.executable,
+            "-u",
+            "-c",
+            fake,
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

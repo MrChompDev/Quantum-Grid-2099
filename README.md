@@ -1,9 +1,10 @@
 # QUANTUM GRID 2099 — BLACKOUT PROTOCOL
 
 A cyberpunk laser-reflection puzzle game played entirely over SSH — now with
-live ICE daemons, splitter prisms, teleport arrays, datashards, persistent
-saves, a 16-entry codex, typewriter cutscenes, two endings, a settings
-system, an 8-bit chiptune engine and a pixel-doubled playfield. Every one of the 48 nodes is
+live ICE daemons (six kinds, including wall-phasing wraiths, lane-charging
+lancers and pulsing volt wards), splitter prisms, teleport arrays, datashards,
+persistent saves, a 19-entry codex, typewriter cutscenes, two endings, a
+settings system, an 8-bit chiptune engine and a pixel-doubled playfield. Every one of the 48 nodes is
 BFS-verified solvable AND beatable with live ICE by an adaptive bot
 (`scripts/audit_levels.py`).
 
@@ -70,9 +71,9 @@ your SSH username **is your save file**. Log in as the same user to resume.
 | 01 | THE SPINE | 1–8 | Mirrors, receptors, bandwidth |
 | 02 | NEON DISTRICT | 9–16 | Splitter prisms, Director Vex |
 | 03 | ICE FOUNDRY | 17–24 | SENTINEL + HUNTER daemons |
-| 04 | THE MAZE | 25–32 | Teleport pad arrays |
-| 05 | BLACK VAULT | 33–40 | CORRUPTOR daemons, heavy ICE mixes |
-| 06 | SINGULARITY CORE | 41–48 | Everything at once, the Grid's heart |
+| 04 | THE MAZE | 25–32 | Teleport pad arrays, WRAITH daemons |
+| 05 | BLACK VAULT | 33–40 | CORRUPTOR + LANCER daemons, heavy ICE mixes |
+| 06 | SINGULARITY CORE | 41–48 | VOLT wards, all six daemons at once |
 
 Every node is procedurally generated, BFS-verified solvable, and shows its
 par (optimal action count) after extraction.
@@ -140,7 +141,8 @@ SSH is a text channel, so the soundtrack is synthesized through the
 terminal bell — pitch-programmed square-wave tones (`CSI 10;Hz` + BEL):
 
 - **Music loops:** title theme, explore theme, and a **danger theme** that
-  kicks in automatically when a hunter ICE gets within striking range.
+  kicks in automatically when any live ICE closes in (a hunter in range, a
+  wraith drifting near, a lancer with a lane on you, a volt at arm's length).
 - **~12 SFX:** move/rotate blips, receptor power-ups, shard arpeggios,
   teleport zaps, ICE-strike hits, extraction fanfares, game-over dirge,
   campaign victory fanfare.
@@ -180,7 +182,10 @@ terminal bell — pitch-programmed square-wave tones (`CSI 10;Hz` + BEL):
 | `✖` | SENTINEL ICE | patrols an axis, bounces off obstacles |
 | `☠` | HUNTER ICE | chases within 6 cells, moves every other tick |
 | `Ψ` | CORRUPTOR ICE | flips a nearby mirror, then backs off and shifts targets - no mirror stays pinned |
-| `▓` | Wall | blocks beams, movement and daemons |
+| `≈` | WRAITH ICE | phase ghost: drifts through walls toward you, one step every third tick |
+| `†` | LANCER ICE | locks onto any probe in its row/column with clear sight and dashes 2 cells per tick |
+| `¥` | VOLT ICE | static ward: pulses a charge field into its 4 adjacent cells every other tick |
+| `▓` | Wall | blocks beams, movement and daemons (not wraiths) |
 | `Ω` | Extraction node | step here with all receptors powered to win |
 
 ### Beam optics
@@ -207,11 +212,20 @@ Daemons act on every successful player action (turn-based):
 
 - **Contact costs 25% bandwidth.** The striking daemon is knocked back a
   cell and stunned 4 ticks; a stunned daemon is walkable (safe to pass).
+  A pulsing volt is never knocked back - its stun *is* the window.
 - Walking **into** live ICE also triggers a strike — the daemon is shoved
   along your path. You can always push through a blocker, at a price.
 - **Sentinels** never chase; learn their lane. **Hunters** are slower than
   you — outrun them, break line of sight. **Corruptors** flip a mirror and
-  back off for a few ticks — race them, then restore your optics.
+  back off for several ticks — race them, then restore your optics. A
+  mirror you're touching (standing on or beside) is protected from
+  corruption: hold your optics while you work. **Wraiths** ignore walls
+  entirely — cover means nothing, keep moving and don't let one drift
+  into your corridor. **Lancers** only dash when they can *see* you down
+  a shared row or column — sidestep off the lane and they crawl. **Volts**
+  never move; they own the four cells around them on a steady pulse —
+  walk through on the off-beat, or bait a pulse and work while the ward
+  recovers.
 - The BFS solver intentionally ignores ICE: it verifies the laser puzzle.
   Beating a node *with* live daemons is the real game.
 
@@ -224,8 +238,9 @@ unlock the true ending — the one where KAI comes home.
 
 ### Codex
 
-Press `C` on the sector or node screen. 16 entries decrypt as you
-progress: faction lore, daemon dossiers, and the truth about ORACLE-9.
+Press `C` on the sector or node screen. 19 entries decrypt as you
+progress: faction lore, daemon dossiers (all six ICE kinds), and the
+truth about ORACLE-9.
 
 ## Architecture
 
@@ -237,12 +252,14 @@ qgrid/
   level_data.py    GENERATED: 48 BFS-verified levels (do not hand-edit)
   levels.py        LevelDef/layout model, ASCII grid parser + border validation
   physics.py       ray-tracing engine (mirrors, splitter prisms, loop guard)
-  enemies.py       ICE daemon AI (sentinel / hunter / corruptor, stun, knockback)
-  solver.py        BFS solver over (player, mirror-state) space, teleport-aware
+  enemies.py       ICE daemon AI (sentinel / hunter / corruptor / wraith /
+                   lancer / volt, stun, knockback, pulse fields, threat map)
+  solver.py        BFS solver over (player, mirror-state) space, teleport-aware,
+                   optional danger-cell blocking for live-ICE planning
   game.py          game state, turns, ICE strikes, shards, teleports, scoring
   audio.py         8-bit chiptune engine (bell tones, songs, SFX, modes)
   audio_client.py  companion player: PTY bridge + local square-wave synth
-  bot.py           adaptive live-ICE playthrough bot (re-planning agent)
+  bot.py           adaptive live-ICE playthrough bot (danger-aware re-planning agent)
   render.py        adaptive full-terminal ANSI frames, 2x2 upscaling, VFX
   save.py          per-username JSON persistence
   server.py        asyncssh server, session state machine, raw input handling
@@ -264,7 +281,9 @@ scripts/
   spawns, probe and extraction node are placed off-path; a subset of
   mirrors starts flipped. Every candidate is re-verified with the BFS
   solver (solvable, optimal within the sector's band, not already solved,
-  shards reachable, hunter levels capped short) before acceptance.
+  shards reachable, ICE-heavy levels capped short) before acceptance.
+  Corruptors never spawn beside a mirror - they have to travel to reach
+  one, which gives runners stability windows.
 - **Solver performance:** the BFS only evaluates the beam trace for states
   where the player stands on the extraction node.
 

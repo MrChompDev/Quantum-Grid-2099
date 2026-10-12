@@ -88,9 +88,7 @@ class TestAllLevelsSolvable:
                 x, y = queue.popleft()
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     n = (x + dx, y + dy)
-                    if not (
-                        0 <= n[0] < layout.width and 0 <= n[1] < layout.height
-                    ):
+                    if not (0 <= n[0] < layout.width and 0 <= n[1] < layout.height):
                         continue
                     t = layout.rows[n[1]][n[0]]
                     if t == WALL or t in EMITTER_CHARS:

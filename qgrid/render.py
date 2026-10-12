@@ -168,7 +168,9 @@ def _cell_str(game, x: int, y: int, gi: int = 0, flash_on: bool = True) -> str:
     return _c(FLOOR_GRAY, assets.FLOOR_GLYPH)
 
 
-def _cell_block(game, x: int, y: int, gi: int, flash_on: bool, sx: int, sy: int) -> list[str]:
+def _cell_block(
+    game, x: int, y: int, gi: int, flash_on: bool, sx: int, sy: int
+) -> list[str]:
     """One grid cell as `sy` rows of `sx` chars (per-axis pixel scaling).
 
     Square blocks (sx == sy) get true diagonal mirrors; everything else
@@ -190,15 +192,9 @@ def _cell_block(game, x: int, y: int, gi: int, flash_on: bool, sx: int, sy: int)
             g = game.mirrors[pos]
             color = MIRROR_CYAN
             if g == "/":  # rising diagonal: bottom-left -> top-right
-                return [
-                    _c(color, " " * (n - 1 - i) + "/" + " " * i)
-                    for i in range(n)
-                ]
+                return [_c(color, " " * (n - 1 - i) + "/" + " " * i) for i in range(n)]
             # falling diagonal: top-left -> bottom-right
-            return [
-                _c(color, " " * i + "\\" + " " * (n - 1 - i))
-                for i in range(n)
-            ]
+            return [_c(color, " " * i + "\\" + " " * (n - 1 - i)) for i in range(n)]
         raw = layout.rows[y][x]
         if raw == WALL:
             return [_c(WALL_BLUE, assets.WALL_GLYPH * n)] * n
@@ -256,9 +252,11 @@ def _bandwidth_bar(bandwidth: int) -> str:
 
 def _header_lines(game, total_score: int = 0) -> list[str]:
     zone = game.defn.zone
-    title = _c(CYAN, f"  QUANTUM GRID 2099 // NODE {game.level_index + 1:02d}") + _c(
-        GRAY, f" - {game.defn.name}"
-    ) + _c(GRAY, f"  [SECTOR {zone:02d}]")
+    title = (
+        _c(CYAN, f"  QUANTUM GRID 2099 // NODE {game.level_index + 1:02d}")
+        + _c(GRAY, f" - {game.defn.name}")
+        + _c(GRAY, f"  [SECTOR {zone:02d}]")
+    )
     powered = len(game.trace.powered)
     total = len(game.layout.receptors)
     if game.all_powered():
@@ -361,7 +359,11 @@ def render_frame(
     indent = max(1, (width - grid_w) // 2)
     if game.shake > 0 and shake_on:
         indent = max(0, indent + SHAKE_OFFSETS[frame % len(SHAKE_OFFSETS)])
-    rule_color = (RED if game.shake > 1 else WALL_BLUE) if (game.shake > 1 and shake_on) else WALL_BLUE
+    rule_color = (
+        (RED if game.shake > 1 else WALL_BLUE)
+        if (game.shake > 1 and shake_on)
+        else WALL_BLUE
+    )
     danger = ice.threat_near(game)
 
     # chrome: rule + 2 HUD lines + grid + status + controls (footer pinned)
@@ -462,9 +464,7 @@ def render_title(
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
-        _center(
-            "Rotate mirrors, split beams, fold space, dodge the daemons.", width
-        ),
+        _center("Rotate mirrors, split beams, fold space, dodge the daemons.", width),
         _center(_c(GRAY, "\u266a no sound? run: python3 -m qgrid.audio_client"), width),
         _center(_blink(">>> PRESS ANY KEY TO JACK IN <<<", frame, BEAM_GREEN), width),
     ]
@@ -493,7 +493,9 @@ def render_save_menu(
                 _center(_c(BEAM_GREEN, "[ENTER] CONTINUE RUN"), width),
                 _center(_c(WHITE, "[N] NEW RUN (resets progress)"), width),
                 "",
-                _center(_c(GRAY, "Shards banked survive a new run? No. The Grid"), width),
+                _center(
+                    _c(GRAY, "Shards banked survive a new run? No. The Grid"), width
+                ),
                 _center(_c(GRAY, "keeps nothing it is not forced to keep."), width),
             ]
         )
@@ -559,7 +561,9 @@ def _node_line(i: int, save: dict, unlock_all: bool) -> str:
     label = f"[{i % ZONE_SIZE + 1}] NODE {i + 1:02d} - {defn.name}"
     if not unlocked:
         return _c(GRAY, label) + _c(RED, " [LOCKED]")
-    line = _c(WHITE, f"[{i % ZONE_SIZE + 1}]") + _c(CYAN, f" NODE {i + 1:02d} - {defn.name}")
+    line = _c(WHITE, f"[{i % ZONE_SIZE + 1}]") + _c(
+        CYAN, f" NODE {i + 1:02d} - {defn.name}"
+    )
     if cleared:
         line += _c(BEAM_GREEN, " \u2713")
     shard_note = ""
@@ -591,7 +595,9 @@ def render_node_select(
     zone = ZONES[zone_num - 1]
     body = [
         _center(
-            _c(CYAN, f"SECTOR {zone_num:02d}") + _c(GRAY, " // ") + _c(WHITE, zone.name),
+            _c(CYAN, f"SECTOR {zone_num:02d}")
+            + _c(GRAY, " // ")
+            + _c(WHITE, zone.name),
             width,
         ),
         _center(_c(GRAY, zone.tagline), width),
@@ -651,7 +657,9 @@ def render_codex(
         body.extend(_wrap_center(text, width, color=GRAY))
     elif detail:
         body.append("")
-        body.append(_center(_c(RED, "SIGNAL ENCRYPTED - entry not yet decrypted"), width))
+        body.append(
+            _center(_c(RED, "SIGNAL ENCRYPTED - entry not yet decrypted"), width)
+        )
     body.extend(
         [
             "",
@@ -681,7 +689,11 @@ def _threat_summary(defn: LevelDef) -> str:
 
 
 def render_level_intro(
-    defn: LevelDef, node_index: int, bandwidth: int, width: int = MIN_W, height: int = MIN_H
+    defn: LevelDef,
+    node_index: int,
+    bandwidth: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
 ) -> str:
     from .levels import parse_level
 
@@ -728,7 +740,12 @@ def render_level_intro(
 
 
 def render_level_complete(
-    game, next_index: int, session_score: int, width: int = MIN_W, height: int = MIN_H, frame: int = 0
+    game,
+    next_index: int,
+    session_score: int,
+    width: int = MIN_W,
+    height: int = MIN_H,
+    frame: int = 0,
 ) -> str:
     from .levels import LEVELS
 
@@ -758,12 +775,11 @@ def render_level_complete(
         ),
         "",
         _center(
-            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"), width,
+            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"),
+            width,
         ),
         "",
-        _center(
-            f"Next: NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width
-        ),
+        _center(f"Next: NODE {next_index + 1:02d} - {LEVELS[next_index].name}", width),
         "",
         _center(_c(BEAM_GREEN, ">>> PRESS ANY KEY TO CONTINUE <<<"), width),
     ]
@@ -787,7 +803,8 @@ def render_sector_clear(
         "",
         _center(f"RUN TOTAL {_c(YELLOW, str(session_score))} PTS", width),
         _center(
-            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"), width,
+            _c(BEAM_GREEN, f"BANDWIDTH REFRESHED TO {BANDWIDTH_MAX}%"),
+            width,
         ),
         "",
         _center(_blink(">>> PRESS ANY KEY TO DESCEND <<<", frame, BEAM_GREEN), width),
@@ -795,7 +812,9 @@ def render_sector_clear(
     return _screen(body, width, height, clear=False)
 
 
-def render_game_over(game, width: int = MIN_W, height: int = MIN_H, frame: int = 0) -> str:
+def render_game_over(
+    game, width: int = MIN_W, height: int = MIN_H, frame: int = 0
+) -> str:
     from .levels import GAMEOVER_LORE
 
     body = [
@@ -810,7 +829,10 @@ def render_game_over(game, width: int = MIN_W, height: int = MIN_H, frame: int =
             f"You fell on NODE {game.level_index + 1:02d} - {game.defn.name}.", width
         ),
         _center(
-            _c(GRAY, "Your progress is saved. The Grid keeps count even when you can't."),
+            _c(
+                GRAY,
+                "Your progress is saved. The Grid keeps count even when you can't.",
+            ),
             width,
         ),
         "",
@@ -845,7 +867,9 @@ def render_victory(
         "",
         _center(_blink("*** MAINFRAME COMPROMISED ***", frame, BEAM_GREEN), width),
         "",
-        *_indent(_colored_banner("GRID", BEAM_GREEN if frame % 2 == 0 else BEAM_GREEN_HI)),
+        *_indent(
+            _colored_banner("GRID", BEAM_GREEN if frame % 2 == 0 else BEAM_GREEN_HI)
+        ),
         "",
         _center(
             _c(WHITE, "FINAL SCORE ")

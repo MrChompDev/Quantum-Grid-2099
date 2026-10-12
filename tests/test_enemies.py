@@ -129,7 +129,9 @@ class TestHunter:
         before = hunter["pos"]
         step_daemons(game)
         # wander may keep it in place or move it; assert it never teleports
-        assert abs(hunter["pos"][0] - before[0]) + abs(hunter["pos"][1] - before[1]) <= 1
+        assert (
+            abs(hunter["pos"][0] - before[0]) + abs(hunter["pos"][1] - before[1]) <= 1
+        )
 
 
 class TestCorruptor:
@@ -288,7 +290,6 @@ class TestCorruptorProbeGrip:
             ],
             seed=1,
         )
-        (corr,) = game.daemons
         mirror_pos = (3, 2)
         before = game.mirrors[mirror_pos]
         for _ in range(20):

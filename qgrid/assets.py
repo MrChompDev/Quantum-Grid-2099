@@ -103,9 +103,7 @@ LEGEND_ROW = (
     f"   {PLAYER_GLYPH} {EXIT_GLYPH}"
 )
 
-LEGEND_LABELS = (
-    "EMITTER     MIRRORS PRISM  PADS SHARD   WALL     PROBE EXIT"
-)
+LEGEND_LABELS = "EMITTER     MIRRORS PRISM  PADS SHARD   WALL     PROBE EXIT"
 
 # Decorative circuit motif for the title screen.
 TITLE_MOTIF = [

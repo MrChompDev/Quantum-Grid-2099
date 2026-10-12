@@ -86,7 +86,9 @@ def _lane_sight(
     return None
 
 
-def _step_sentinel(layout, en: dict, occupied: set[tuple[int, int]]) -> tuple[int, int] | None:
+def _step_sentinel(
+    layout, en: dict, occupied: set[tuple[int, int]]
+) -> tuple[int, int] | None:
     """Walk one step along the patrol axis; reverse when blocked. Returns new pos."""
     px, py = _pos(en)
     dx, dy = en["dir"]
@@ -100,7 +102,9 @@ def _step_sentinel(layout, en: dict, occupied: set[tuple[int, int]]) -> tuple[in
     return cand
 
 
-def _step_hunter(layout, en: dict, player, occupied: set[tuple[int, int]], rng) -> tuple[int, int] | None:
+def _step_hunter(
+    layout, en: dict, player, occupied: set[tuple[int, int]], rng
+) -> tuple[int, int] | None:
     """Greedy chase within sense range, else deterministic wander. Returns new pos."""
     px, py = _pos(en)
     if player is not None:
@@ -174,17 +178,20 @@ def _step_corruptor(
                 continue
             mirrors[spot] = "/" if mirrors[spot] == "\\" else "\\"
             en["last_target"] = spot
-            en["cooldown"] = 4
+            en["cooldown"] = 8
             en["dir"] = rng.choice(DIR4)
             return None
     if not mirrors:
         return None
-    # Seek the nearest mirror excluding the last target and any the probe holds.
-    candidates = [
-        m
-        for m in mirrors
-        if m != last and not (player is not None and _holds(mirrors, player, m))
-    ] or [m for m in mirrors if m != last] or list(mirrors)
+    # Seek the nearest mirror we may actually touch: not the last target,
+    # not one the probe holds. If every optic is held, the corruptor
+    # idles - the runner earned that window.
+    held = lambda m: player is not None and _holds(mirrors, player, m)
+    candidates = [m for m in mirrors if m != last and not held(m)]
+    if not candidates:
+        candidates = [m for m in mirrors if not held(m)]
+    if not candidates:
+        return None
     target = min(
         candidates,
         key=lambda m: (abs(m[0] - px) + abs(m[1] - py), m[0], m[1]),
@@ -195,12 +202,20 @@ def _step_corruptor(
         options.append(((1 if target[0] > px else -1), 0))
     if target[1] != py:
         options.append((0, (1 if target[1] > py else -1)))
-    options.sort(key=lambda d: -(abs(target[0] - (px + d[0])) + abs(target[1] - (py + d[1]))))
+    options.sort(
+        key=lambda d: -(abs(target[0] - (px + d[0])) + abs(target[1] - (py + d[1])))
+    )
     for dx, dy in options:
         cand = (px + dx, py + dy)
         if not cell_blocked_for_enemy(layout, occupied, cand):
             en["pos"] = cand
             return cand
+    # Path to the target is fenced off: drift instead of deadlocking.
+    dx, dy = rng.choice(DIR4)
+    cand = (px + dx, py + dy)
+    if not cell_blocked_for_enemy(layout, occupied, cand):
+        en["pos"] = cand
+        return cand
     return None
 
 
@@ -210,7 +225,9 @@ def _holds(mirrors, player: tuple[int, int], spot: tuple[int, int]) -> bool:
     return abs(player[0] - spot[0]) + abs(player[1] - spot[1]) <= 1
 
 
-def _step_wraith(layout, en: dict, player, occupied: set[tuple[int, int]], rng) -> tuple[int, int] | None:
+def _step_wraith(
+    layout, en: dict, player, occupied: set[tuple[int, int]], rng
+) -> tuple[int, int] | None:
     """Phase ghost: drifts toward the probe within 8 cells, else wanders -
     straight through walls, mirrors and hardware. Blocked only by the
     perimeter and other daemons. Returns new pos or None."""
@@ -283,7 +300,9 @@ def _step_lancer(
     return cand
 
 
-def _volt_field(layout, en: dict, occupied: set[tuple[int, int]]) -> list[tuple[int, int]]:
+def _volt_field(
+    layout, en: dict, occupied: set[tuple[int, int]]
+) -> list[tuple[int, int]]:
     """The four adjacent cells a volt charges when it pulses: open floor
     only (walls and hardware ground the charge)."""
     px, py = _pos(en)
@@ -299,9 +318,7 @@ def _volt_field(layout, en: dict, occupied: set[tuple[int, int]]) -> list[tuple[
     return cells
 
 
-def _step_volt(
-    layout, en: dict, player, occupied: set[tuple[int, int]], game
-) -> bool:
+def _step_volt(layout, en: dict, player, occupied: set[tuple[int, int]], game) -> bool:
     """Static ward: never moves. Every other tick it pulses its charge
     field; returns True when the probe was caught in the pulse (the
     caller records the strike). The field glints either way."""
@@ -375,7 +392,9 @@ def step_daemons(game) -> list[tuple[dict, tuple[int, int]]]:
     return strikes
 
 
-def knock_back(en: dict, origin: tuple[int, int], player: tuple[int, int], game) -> None:
+def knock_back(
+    en: dict, origin: tuple[int, int], player: tuple[int, int], game
+) -> None:
     """Push a striking daemon off the probe: prefer the cell it came from,
     else any free neighbor. Falls back to stun only. Static wards (volts)
     never move - the stun alone opens the window."""
@@ -384,9 +403,7 @@ def knock_back(en: dict, origin: tuple[int, int], player: tuple[int, int], game)
     candidates = [origin] if origin != player else []
     px, py = en["pos"]
     candidates += [
-        (px + dx, py + dy)
-        for dx, dy in DIR4
-        if (px + dx, py + dy) != player
+        (px + dx, py + dy) for dx, dy in DIR4 if (px + dx, py + dy) != player
     ]
     occupied = {o["pos"] for o in game.daemons} | {game.player}
     for cand in candidates:
@@ -412,7 +429,10 @@ def threat_near(game) -> bool:
             return True
         if kind in ("lancer", "volt") and dist <= 1:
             return True
-        if kind == "lancer" and dist <= 6:
-            if _lane_sight(game.layout, (ex, ey), (px, py), game.mirrors):
-                return True
+        if (
+            kind == "lancer"
+            and dist <= 6
+            and _lane_sight(game.layout, (ex, ey), (px, py), game.mirrors)
+        ):
+            return True
     return False

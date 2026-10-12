@@ -155,8 +155,24 @@ class Session:
             if ch in DIR_VECTORS:
                 return ch
             if ch in (
-                "r", "R", "k", "K", "c", "C", "n", "N", "m", "M", "o", "O",
-                "s", "S", "w", "W", "x", "X",
+                "r",
+                "R",
+                "k",
+                "K",
+                "c",
+                "C",
+                "n",
+                "N",
+                "m",
+                "M",
+                "o",
+                "O",
+                "s",
+                "S",
+                "w",
+                "W",
+                "x",
+                "X",
             ):
                 return ch.lower()
             if ch.isdigit() or ch in ("\r", "\n", " "):
@@ -313,8 +329,7 @@ class Session:
                     banked = sum(len(v) for v in self.save.get("shards", {}).values())
                     true_end = (
                         _total_shards_in_game() > 0
-                        and banked
-                        >= SHARDS_FOR_TRUE_ENDING * _total_shards_in_game()
+                        and banked >= SHARDS_FOR_TRUE_ENDING * _total_shards_in_game()
                     )
                     ending_cut = ENDING_CUTSCENES["true" if true_end else "standard"]
                     result = await self._play_cutscene(ending_cut)
@@ -352,7 +367,8 @@ class Session:
         while True:
             self.width, self.height = self._frame_size()
             self.write(
-                CLEAR + render_save_menu(self.save, self.username, self.width, self.height)
+                CLEAR
+                + render_save_menu(self.save, self.username, self.width, self.height)
             )
             key = await self.read_key()
             if key is QUIT:
@@ -376,8 +392,7 @@ class Session:
         while True:
             self.width, self.height = self._frame_size()
             self.write(
-                CLEAR
-                + render_codex(self.save, sel, detail, self.width, self.height)
+                CLEAR + render_codex(self.save, sel, detail, self.width, self.height)
             )
             key = await self.read_key()
             if key is QUIT or key == "c":
@@ -447,8 +462,7 @@ class Session:
         while True:
             self.width, self.height = self._frame_size()
             self.write(
-                CLEAR
-                + render_settings(self.settings, sel, self.width, self.height)
+                CLEAR + render_settings(self.settings, sel, self.width, self.height)
             )
             key = await self.read_key()
             if key is QUIT or key in ("q", "c"):
@@ -581,8 +595,7 @@ class Session:
         self._last_game = game
         self.width, self.height = self._frame_size()
         self.write(
-            CLEAR
-            + render_level_intro(defn, index, bandwidth, self.width, self.height)
+            CLEAR + render_level_intro(defn, index, bandwidth, self.width, self.height)
         )
         if await self.read_key() is QUIT:
             return "quit"
@@ -591,8 +604,13 @@ class Session:
         self._fx_game = game
         self.write(
             render_frame(
-                game, self.width, self.height, self.session_score,
-                self.frame_no, self.player.music_on, self._vfx(),
+                game,
+                self.width,
+                self.height,
+                self.session_score,
+                self.frame_no,
+                self.player.music_on,
+                self._vfx(),
             )
         )
         try:
@@ -605,8 +623,13 @@ class Session:
                     self.toggle_sound()
                     self.write(
                         render_frame(
-                            game, self.width, self.height, self.session_score,
-                            self.frame_no, self.player.music_on, self._vfx(),
+                            game,
+                            self.width,
+                            self.height,
+                            self.session_score,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
                         )
                     )
                     continue
@@ -614,8 +637,13 @@ class Session:
                     game.restart()
                     self.write(
                         render_frame(
-                            game, self.width, self.height, self.session_score,
-                            self.frame_no, self.player.music_on, self._vfx(),
+                            game,
+                            self.width,
+                            self.height,
+                            self.session_score,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
                         )
                     )
                     continue
@@ -639,8 +667,12 @@ class Session:
                     self.player.sfx("unlock")
                     key = await self._show_animated(
                         lambda f: render_level_complete(
-                            game, index + 1, self.session_score,
-                            self.width, self.height, f,
+                            game,
+                            index + 1,
+                            self.session_score,
+                            self.width,
+                            self.height,
+                            f,
                         )
                     )
                     if key is QUIT:
@@ -658,8 +690,11 @@ class Session:
                         zone = ZONES[defn.zone - 1]
                         key = await self._show_animated(
                             lambda f, z=zone: render_sector_clear(
-                                z, self.session_score,
-                                self.width, self.height, f,
+                                z,
+                                self.session_score,
+                                self.width,
+                                self.height,
+                                f,
                             )
                         )
                         if key is QUIT:
@@ -679,8 +714,13 @@ class Session:
                 self.width, self.height = self._frame_size()
                 self.write(
                     render_frame(
-                        game, self.width, self.height, self.session_score,
-                        self.frame_no, self.player.music_on, self._vfx(),
+                        game,
+                        self.width,
+                        self.height,
+                        self.session_score,
+                        self.frame_no,
+                        self.player.music_on,
+                        self._vfx(),
                     )
                 )
         finally:

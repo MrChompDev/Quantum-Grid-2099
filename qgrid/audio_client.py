@@ -138,7 +138,9 @@ class TonePlayer:
                 if windows:
                     subprocess.run(
                         [
-                            "powershell", "-NoProfile", "-Command",
+                            "powershell",
+                            "-NoProfile",
+                            "-Command",
                             f"[console]::beep({freq},{ms})",
                         ],
                         stdout=subprocess.DEVNULL,
@@ -164,7 +166,9 @@ def _set_winsize(master: int) -> None:
     try:
         size = shutil.get_terminal_size()
         fcntl.ioctl(
-            master, termios.TIOCSWINSZ, struct.pack("HHHH", size.lines, size.columns, 0, 0)
+            master,
+            termios.TIOCSWINSZ,
+            struct.pack("HHHH", size.lines, size.columns, 0, 0),
         )
     except (OSError, ValueError):
         pass

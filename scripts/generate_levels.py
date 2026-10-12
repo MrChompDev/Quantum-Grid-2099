@@ -34,23 +34,59 @@ N_LEVELS = 48
 
 NAMES = [
     # Sector 1 - THE SPINE
-    "FIRST LIGHT", "COLD BOOT", "WARM SIGNAL", "DEAD DROP",
-    "LINE OF SIGHT", "SHORT CIRCUIT", "LIVE WIRE", "GATE CRASHER",
+    "FIRST LIGHT",
+    "COLD BOOT",
+    "WARM SIGNAL",
+    "DEAD DROP",
+    "LINE OF SIGHT",
+    "SHORT CIRCUIT",
+    "LIVE WIRE",
+    "GATE CRASHER",
     # Sector 2 - NEON DISTRICT
-    "PULSE STREET", "NEON RAIN", "SIGNAL NOISE", "BLACK MARKET",
-    "SPLIT FOCUS", "PRISM ALLEY", "GHOST LANE", "DISTRICT LOCKDOWN",
+    "PULSE STREET",
+    "NEON RAIN",
+    "SIGNAL NOISE",
+    "BLACK MARKET",
+    "SPLIT FOCUS",
+    "PRISM ALLEY",
+    "GHOST LANE",
+    "DISTRICT LOCKDOWN",
     # Sector 3 - ICE FOUNDRY
-    "FROSTBITE", "ICE BREAKER", "COLD STEEL", "THE HUNTER",
-    "SENTINEL WALK", "FROZEN ASSETS", "GLASSHOUSE", "FOUNDRY CORE",
+    "FROSTBITE",
+    "ICE BREAKER",
+    "COLD STEEL",
+    "THE HUNTER",
+    "SENTINEL WALK",
+    "FROZEN ASSETS",
+    "GLASSHOUSE",
+    "FOUNDRY CORE",
     # Sector 4 - THE MAZE
-    "MAZE RUNNER", "WORMHOLE", "SIDE STEP", "TWISTED PAIR",
-    "THE LONG WAY", "BLINK DRIVE", "LABYRINTH", "MAZE HEART",
+    "MAZE RUNNER",
+    "WORMHOLE",
+    "SIDE STEP",
+    "TWISTED PAIR",
+    "THE LONG WAY",
+    "BLINK DRIVE",
+    "LABYRINTH",
+    "MAZE HEART",
     # Sector 5 - BLACK VAULT
-    "VAULT DOOR", "SPLIT DECISION", "DAEMON DANCE", "CORRUPTED",
-    "HEAVY ICE", "DOUBLE CROSS", "VAULT RUN", "THE CRUCIBLE",
+    "VAULT DOOR",
+    "SPLIT DECISION",
+    "DAEMON DANCE",
+    "CORRUPTED",
+    "HEAVY ICE",
+    "DOUBLE CROSS",
+    "VAULT RUN",
+    "THE CRUCIBLE",
     # Sector 6 - SINGULARITY CORE
-    "THRESHOLD", "EVENT HORIZON", "CORE LIGHT", "LAST MILE",
-    "SYSTEM SHOCK", "FINAL FIREWALL", "GRID HEART", "SINGULARITY",
+    "THRESHOLD",
+    "EVENT HORIZON",
+    "CORE LIGHT",
+    "LAST MILE",
+    "SYSTEM SHOCK",
+    "FINAL FIREWALL",
+    "GRID HEART",
+    "SINGULARITY",
 ]
 
 # Difficulty bands per sector (BFS-optimal action count range).
@@ -78,6 +114,7 @@ ZONE_PADS = [
     [0, 0, 0, 0, 0, 0, 0, 0],
     [0, 1, 0, 0, 1, 0, 0, 1],
 ]
+
 
 # ICE daemons per level: (sentinels, hunters, corruptors, wraiths,
 # lancers, volts). New daemons enter mid-campaign: WRAITH haunts the
@@ -144,7 +181,11 @@ def _construct_full(rng, cfg):
                 nx, ny = x + dx, y + dy
                 if not (0 < nx < w - 1 and 0 < ny < h - 1):
                     break
-                if (nx, ny) in emitter_cells or (nx, ny) in mirrors or (nx, ny) in splitters:
+                if (
+                    (nx, ny) in emitter_cells
+                    or (nx, ny) in mirrors
+                    or (nx, ny) in splitters
+                ):
                     break
                 if (nx, ny) in path or any((nx, ny) in p for p in paths):
                     break
@@ -170,7 +211,11 @@ def _construct_full(rng, cfg):
             nx, ny = x + dx, y + dy
             if not (0 < nx < w - 1 and 0 < ny < h - 1):
                 break
-            if (nx, ny) in emitter_cells or (nx, ny) in mirrors or (nx, ny) in splitters:
+            if (
+                (nx, ny) in emitter_cells
+                or (nx, ny) in mirrors
+                or (nx, ny) in splitters
+            ):
                 break
             if (nx, ny) in path or any((nx, ny) in p for p in paths):
                 break
@@ -180,7 +225,8 @@ def _construct_full(rng, cfg):
 
     for ei in range(cfg["n_emitters"]):
         free = [
-            c for c in interior
+            c
+            for c in interior
             if c not in emitter_cells and c not in mirrors and c not in splitters
         ]
         if not free:
@@ -235,7 +281,9 @@ def _construct_full(rng, cfg):
         return None
     player, exit_pos = rng.sample(candidates, 2)
     for _ in range(16):
-        if abs(player[0] - exit_pos[0]) + abs(player[1] - exit_pos[1]) >= max(4, (w + h) // 4):
+        if abs(player[0] - exit_pos[0]) + abs(player[1] - exit_pos[1]) >= max(
+            4, (w + h) // 4
+        ):
             break
         player, exit_pos = rng.sample(candidates, 2)
 
@@ -258,14 +306,17 @@ def _construct_full(rng, cfg):
     )
     for kch in kind_chars:
         options = [
-            c for c in candidates
+            c
+            for c in candidates
             if c not in taken
             and abs(c[0] - player[0]) + abs(c[1] - player[1]) >= 5
             and sum(
-                1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                1
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                 if (c[0] + dx, c[1] + dy) in free_cells
                 and (c[0] + dx, c[1] + dy) not in taken
-            ) >= 2
+            )
+            >= 2
             # corruptors never camp beside a mirror: they must travel to
             # reach one, giving runners stability windows to work in
             and (
@@ -359,12 +410,20 @@ def generate_level(index: int, rng: Random) -> dict:
         # bandwidth budget.
         opt_max = min(opt_max, 48)
     cfg = {
-        "w": w, "h": h,
-        "n_mirrors": n_mirrors, "n_receptors": n_receptors,
-        "n_emitters": n_emitters, "n_walls": n_walls,
-        "n_splitters": n_splitters, "n_pads": n_pads,
-        "n_sentinels": n_sent, "n_hunters": n_hunt, "n_corruptors": n_corr,
-        "n_wraiths": n_wrth, "n_lancers": n_lanc, "n_volts": n_volt,
+        "w": w,
+        "h": h,
+        "n_mirrors": n_mirrors,
+        "n_receptors": n_receptors,
+        "n_emitters": n_emitters,
+        "n_walls": n_walls,
+        "n_splitters": n_splitters,
+        "n_pads": n_pads,
+        "n_sentinels": n_sent,
+        "n_hunters": n_hunt,
+        "n_corruptors": n_corr,
+        "n_wraiths": n_wrth,
+        "n_lancers": n_lanc,
+        "n_volts": n_volt,
     }
 
     attempts = 0
@@ -396,9 +455,7 @@ def generate_level(index: int, rng: Random) -> dict:
             continue
         if len(layout.pads) // 2 < n_pads:
             continue
-        if len(layout.enemies) < (
-            n_sent + n_hunt + n_corr + n_wrth + n_lanc + n_volt
-        ):
+        if len(layout.enemies) < (n_sent + n_hunt + n_corr + n_wrth + n_lanc + n_volt):
             continue
         intro_bits = [
             f"Sector {zone:02d}, node {node + 1}.",

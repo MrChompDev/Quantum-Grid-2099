@@ -63,6 +63,8 @@ def solve_state(
             # the probe at its twin, matching Game.do_move. The pad cell
             # itself is never a place the probe can stand.
             eff = pads.get(nxt, nxt)
+            if eff in blocked:
+                continue
             state = (eff, mirrors_fs)
             if state not in visited:
                 visited.add(state)

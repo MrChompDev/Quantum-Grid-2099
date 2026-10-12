@@ -50,9 +50,7 @@ class Game:
         self.strikes = 0
         self.shards_taken: set[tuple[int, int]] = set()
         self.shards_banked: set[tuple[int, int]] = set()  # carried from prior runs
-        self._rng_seed = (
-            rng_seed if rng_seed is not None else level_index * 7919 + 2099
-        )
+        self._rng_seed = rng_seed if rng_seed is not None else level_index * 7919 + 2099
         self.rng = random.Random(self._rng_seed)
         self.no_ice = no_ice
         self.daemons: list[dict] = (
@@ -86,9 +84,7 @@ class Game:
     def decay_fx(self) -> None:
         """Age transient visual effects by one rendered frame."""
         if self.flash:
-            self.flash = {
-                pos: n - 1 for pos, n in self.flash.items() if n > 1
-            }
+            self.flash = {pos: n - 1 for pos, n in self.flash.items() if n > 1}
         if self.shake > 0:
             self.shake -= 1
 
@@ -226,8 +222,7 @@ class Game:
             self.strikes += 1
             self.refresh()
             self.msg = (
-                f"ICE STRIKE! -{ice.ICE_STRIKE_COST}% bandwidth."
-                " Daemon stunned - move!"
+                f"ICE STRIKE! -{ice.ICE_STRIKE_COST}% bandwidth. Daemon stunned - move!"
             )
             self._fx("strike")
             return
@@ -301,11 +296,7 @@ class Game:
     def score(self) -> int:
         par = self.defn.par or self.actions or 1
         efficiency = max(0, 2 * par - self.actions) * EFFICIENCY_BONUS
-        return (
-            self.bandwidth * 10
-            + len(self.shards_taken) * SHARD_SCORE
-            + efficiency
-        )
+        return self.bandwidth * 10 + len(self.shards_taken) * SHARD_SCORE + efficiency
 
     def finish_level(self) -> int:
         """Refresh bandwidth to full and unlock the next node."""

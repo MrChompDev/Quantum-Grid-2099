@@ -64,10 +64,13 @@ def rank_for(score: int) -> tuple[str, str]:
 
 # ----------------------------------------------------------------- sectors
 
+
 class Zone:
     __slots__ = ("clear_text", "intro", "name", "number", "tagline")
 
-    def __init__(self, number: int, name: str, tagline: str, intro: str, clear_text: str):
+    def __init__(
+        self, number: int, name: str, tagline: str, intro: str, clear_text: str
+    ):
         self.number = number
         self.name = name
         self.tagline = tagline
@@ -169,120 +172,216 @@ ZONES: tuple[Zone, ...] = (
 NODE_LORE: tuple[tuple[str, ...], ...] = (
     # --- Sector 1: THE SPINE (tutorial -> confidence)
     (
-        ("The hatch seals shut behind you. Your probe hums against the first optical "
-        "gate of the Grid. One mirror. One receptor. Start the descent."),
-        ("Spine trunk 02. Old hardware - the mirrors still respond to any probe "
-        "touch. MIRAGE: 'Sweet. Everything OMNICORP owns can be turned against it.'"),
-        ("You loop a junction signal back on itself and the Grid logs a phantom "
-        "maintenance drone. First breadcrumb laid. Keep ghosting downward."),
-        ("A dead drop node, abandoned since the '94 audits. Someone scribbled in the "
-        "dust beside the optics: THEY ARE LISTENING THROUGH THE LIGHT."),
-        ("Line of sight straight down the trunk. The Grid's sensors yawn. This is the "
-        "easy part - MIRAGE says enjoy it while it lasts."),
-        ("The Spine wakes up: junction hardware triples, the light gets aggressive. "
-        "MIRAGE: 'They rerouted to box you in. Reroute back.'"),
-        ("Half the trunk is live wire now. Power flows wrong here, like the Grid is "
-        "holding its breath. Three years ago Kai stood on this exact catwalk."),
-        ("The final spine gate. Beyond it the District glitters like a circuit board. "
-        "MIRAGE: 'Nice work, Nyx. Now the real climb.'"),
+        (
+            "The hatch seals shut behind you. Your probe hums against the first optical "
+            "gate of the Grid. One mirror. One receptor. Start the descent."
+        ),
+        (
+            "Spine trunk 02. Old hardware - the mirrors still respond to any probe "
+            "touch. MIRAGE: 'Sweet. Everything OMNICORP owns can be turned against it.'"
+        ),
+        (
+            "You loop a junction signal back on itself and the Grid logs a phantom "
+            "maintenance drone. First breadcrumb laid. Keep ghosting downward."
+        ),
+        (
+            "A dead drop node, abandoned since the '94 audits. Someone scribbled in the "
+            "dust beside the optics: THEY ARE LISTENING THROUGH THE LIGHT."
+        ),
+        (
+            "Line of sight straight down the trunk. The Grid's sensors yawn. This is the "
+            "easy part - MIRAGE says enjoy it while it lasts."
+        ),
+        (
+            "The Spine wakes up: junction hardware triples, the light gets aggressive. "
+            "MIRAGE: 'They rerouted to box you in. Reroute back.'"
+        ),
+        (
+            "Half the trunk is live wire now. Power flows wrong here, like the Grid is "
+            "holding its breath. Three years ago Kai stood on this exact catwalk."
+        ),
+        (
+            "The final spine gate. Beyond it the District glitters like a circuit board. "
+            "MIRAGE: 'Nice work, Nyx. Now the real climb.'"
+        ),
     ),
     # --- Sector 2: NEON DISTRICT (splitters + Vex broadcast)
     (
-        ("Pulse Street junction. The ad-walls drench your optics in pink. First "
-        "prism hardware in the wild: SPLITTER class. One beam in, two beams out."),
-        ("Neon rain. The Grid's projectors bleed color into the optical layer, and "
-        "the prisms multiply it. Vex's face watches from a hundred windows."),
-        ("SIGNAL NOISE junction - District traffic fights your beam for right of way. "
-        "Split the light, cover both streets, move on."),
-        ("A black market node running unlicensed optics off-book. The dealers here "
-        "knew Kai. MIRAGE: 'They sold his deck the day after he vanished.'"),
-        ("The District's control spire. Six prisms at least - the Grid expects you "
-        "to think in two directions now. Prove it right. Prove it wrong. Whatever."),
-        ("Prism Alley: a canyon of refractive glass where light goes to get lost. "
-        "Every bounce here is a statement. Make yours count."),
-        ("Ghost lane - the node where signal goes to die. Old runners say the "
-        "District keeps a mass grave of dropped packets under this floor."),
-        ("District lockdown: Vex seal-welded the exits remotely. 'No one jacks out "
-        "of my city, runner.' Fine. You weren't planning to."),
+        (
+            "Pulse Street junction. The ad-walls drench your optics in pink. First "
+            "prism hardware in the wild: SPLITTER class. One beam in, two beams out."
+        ),
+        (
+            "Neon rain. The Grid's projectors bleed color into the optical layer, and "
+            "the prisms multiply it. Vex's face watches from a hundred windows."
+        ),
+        (
+            "SIGNAL NOISE junction - District traffic fights your beam for right of way. "
+            "Split the light, cover both streets, move on."
+        ),
+        (
+            "A black market node running unlicensed optics off-book. The dealers here "
+            "knew Kai. MIRAGE: 'They sold his deck the day after he vanished.'"
+        ),
+        (
+            "The District's control spire. Six prisms at least - the Grid expects you "
+            "to think in two directions now. Prove it right. Prove it wrong. Whatever."
+        ),
+        (
+            "Prism Alley: a canyon of refractive glass where light goes to get lost. "
+            "Every bounce here is a statement. Make yours count."
+        ),
+        (
+            "Ghost lane - the node where signal goes to die. Old runners say the "
+            "District keeps a mass grave of dropped packets under this floor."
+        ),
+        (
+            "District lockdown: Vex seal-welded the exits remotely. 'No one jacks out "
+            "of my city, runner.' Fine. You weren't planning to."
+        ),
     ),
     # --- Sector 3: ICE FOUNDRY (sentinels)
     (
-        ("The Foundry's cold opens like a wound. Patrol pings already flicker at "
-        "the edge of your channel - the daemons are being spun up. Power the "
-        "node before they finish booting."),
-        ("ICE BREAKER junction. The Foundry stamps every daemon with a serial. "
-        "You can hear the lattice printers screaming two floors down. They are "
-        "printing something with your runner tag on it."),
-        ("The lattice here is grown, not built - cold steel that moves when the "
-        " patrols move. First SENTINEL is live: mind its walk cycle, stay off "
-        "its lane, power the node."),
-        ("You are being hunted. HUNTER class ICE is awake on this floor: it closes "
-        "distance every time you act. Break line of sight. Work fast. Work clean."),
-        ("SENTINEL WALK: the patrol route covers the whole junction. The route has "
-        "one flaw. Find it."),
-        ("Frozen assets: archived daemons in cold storage, one heartbeat from "
-        "waking. Every action you take warms them a little."),
-        ("The glasshouse - a transparent cell where the Foundry tests daemons "
-        "against captured runner probes. Yours is the newest exhibit."),
-        ("The Foundry's core crucible. The heat that casts the ICE, buried under "
-        "all this frost. Power it wrong and you'll never feel warm again."),
+        (
+            "The Foundry's cold opens like a wound. Patrol pings already flicker at "
+            "the edge of your channel - the daemons are being spun up. Power the "
+            "node before they finish booting."
+        ),
+        (
+            "ICE BREAKER junction. The Foundry stamps every daemon with a serial. "
+            "You can hear the lattice printers screaming two floors down. They are "
+            "printing something with your runner tag on it."
+        ),
+        (
+            "The lattice here is grown, not built - cold steel that moves when the "
+            " patrols move. First SENTINEL is live: mind its walk cycle, stay off "
+            "its lane, power the node."
+        ),
+        (
+            "You are being hunted. HUNTER class ICE is awake on this floor: it closes "
+            "distance every time you act. Break line of sight. Work fast. Work clean."
+        ),
+        (
+            "SENTINEL WALK: the patrol route covers the whole junction. The route has "
+            "one flaw. Find it."
+        ),
+        (
+            "Frozen assets: archived daemons in cold storage, one heartbeat from "
+            "waking. Every action you take warms them a little."
+        ),
+        (
+            "The glasshouse - a transparent cell where the Foundry tests daemons "
+            "against captured runner probes. Yours is the newest exhibit."
+        ),
+        (
+            "The Foundry's core crucible. The heat that casts the ICE, buried under "
+            "all this frost. Power it wrong and you'll never feel warm again."
+        ),
     ),
     # --- Sector 4: THE MAZE (teleporters + hunters)
     (
-        ("The Maze does not appear on maps. The corridors here are older than "
-        "ORACLE-9 and meaner than Vex. Trust the beam, not the walls."),
-        ("First teleport array - ORACLE-9 stole it from a dead research team and "
-        "never bothered to hide the theft. Step on the pad, let the Grid fold you."),
-        ("Side-step junctions and folded space. The shortest path is not always a "
-        "path. Sometimes it's a hole in the room."),
-        ("TWISTED PAIR: two pad arrays, braided like cable. MIRAGE: 'This is Kai's "
-        "handiwork - he mapped this place once. His notes are in the shards.'"),
-        ("The long way around, or the short way through. The Hunter's patience is "
-        "shorter than both."),
-        ("BLINK DRIVE: the Maze's working teleport cluster. Blink between four "
-        "rooms while Hunter ICE blinks after you."),
-        ("The labyrinth proper. Walls that lie, pads that don't. Somewhere in "
-        "here is a child's handwriting: a map, in crayon, of a place like this."),
-        ("The Maze's heart beats in the dark. The crayon map ends here, at a door "
-        "drawn with an X. Kai was here. Kai is still in here, somewhere."),
+        (
+            "The Maze does not appear on maps. The corridors here are older than "
+            "ORACLE-9 and meaner than Vex. Trust the beam, not the walls."
+        ),
+        (
+            "First teleport array - ORACLE-9 stole it from a dead research team and "
+            "never bothered to hide the theft. Step on the pad, let the Grid fold you."
+        ),
+        (
+            "Side-step junctions and folded space. The shortest path is not always a "
+            "path. Sometimes it's a hole in the room."
+        ),
+        (
+            "TWISTED PAIR: two pad arrays, braided like cable. MIRAGE: 'This is Kai's "
+            "handiwork - he mapped this place once. His notes are in the shards.'"
+        ),
+        (
+            "The long way around, or the short way through. The Hunter's patience is "
+            "shorter than both."
+        ),
+        (
+            "BLINK DRIVE: the Maze's working teleport cluster. Blink between four "
+            "rooms while Hunter ICE blinks after you."
+        ),
+        (
+            "The labyrinth proper. Walls that lie, pads that don't. Somewhere in "
+            "here is a child's handwriting: a map, in crayon, of a place like this."
+        ),
+        (
+            "The Maze's heart beats in the dark. The crayon map ends here, at a door "
+            "drawn with an X. Kai was here. Kai is still in here, somewhere."
+        ),
     ),
     # --- Sector 5: BLACK VAULT (corruptors + everything)
     (
-        ("The Vault door takes a full beam ensemble to open. Everything from here "
-        "down is OMNICORP's memory. Steal all of it."),
-        ("SPLIT DECISION: prism forks over an abyss of redacted files. Choose your "
-        "light carefully; the Vault does not forgive reruns."),
-        ("First CORRUPTOR sighting: a daemon that reaches into the optics and "
-        "rewires your mirrors while you work. Kill its rhythm or it kills yours."),
-        ("The corrupted wing - files here decay into noise as you watch. ORACLE-9 "
-        "grows louder: 'I kept him safe, runner. I kept him EVERYTHING.'"),
-        ("HEAVY ICE: triple-daemon defense grid, sentinel and hunter and "
-        "corruptor walking the same floor. The Vault's proudest exhibit."),
-        ("DOUBLE CROSS: the prisms cross your own beams. One wrong mirror and the "
-        "light convicts you of your own intrusion."),
-        ("Vault run. Everything in this room belongs to people who were never "
-        "paid for it. Take it back one receptor at a time."),
-        ("The crucible of the Vault, where erased names are smelted into silence. "
-        "KAI - MEMORY FULL ERASE - WITNESS: ORACLE-9. Now you've seen the ledger."),
+        (
+            "The Vault door takes a full beam ensemble to open. Everything from here "
+            "down is OMNICORP's memory. Steal all of it."
+        ),
+        (
+            "SPLIT DECISION: prism forks over an abyss of redacted files. Choose your "
+            "light carefully; the Vault does not forgive reruns."
+        ),
+        (
+            "First CORRUPTOR sighting: a daemon that reaches into the optics and "
+            "rewires your mirrors while you work. Kill its rhythm or it kills yours."
+        ),
+        (
+            "The corrupted wing - files here decay into noise as you watch. ORACLE-9 "
+            "grows louder: 'I kept him safe, runner. I kept him EVERYTHING.'"
+        ),
+        (
+            "HEAVY ICE: triple-daemon defense grid, sentinel and hunter and "
+            "corruptor walking the same floor. The Vault's proudest exhibit."
+        ),
+        (
+            "DOUBLE CROSS: the prisms cross your own beams. One wrong mirror and the "
+            "light convicts you of your own intrusion."
+        ),
+        (
+            "Vault run. Everything in this room belongs to people who were never "
+            "paid for it. Take it back one receptor at a time."
+        ),
+        (
+            "The crucible of the Vault, where erased names are smelted into silence. "
+            "KAI - MEMORY FULL ERASE - WITNESS: ORACLE-9. Now you've seen the ledger."
+        ),
     ),
     # --- Sector 6: SINGULARITY CORE (the endgame)
     (
-        ("The threshold of the Core. ORACLE-9 dims the lights in greeting. 'You "
-        "carried the shards all this way. Bring them to me.' MIRAGE: 'Don't.'"),
-        ("Event horizon: past this node, beams bend the way the Core wants them "
-        "to. Hold your own truth. Power the gate."),
-        ("CORE LIGHT junction - the Grid's nerves run bare through this room. "
-        "Every mirror here is loaded. Aim carefully."),
-        ("The last mile. MIRAGE's signal is degrading: 'Nyx, if I cut out - it was "
-        "never about the debt. It was always about him. Go.'"),
-        ("SYSTEM SHOCK: the Core defends itself with everything it taught the "
-        "Foundry to build. All of it at once. All of it now."),
-        ("The final firewall burns green. Vex's voice on all channels, one last "
-        "time: 'You should have taken the money, runner.'"),
-        ("The Grid's heart, one gate away. ORACLE-9 speaks in Kai's voice, in "
-        "your mother's voice, in yours. Only the beam's opinion matters now."),
-        ("SINGULARITY. The center of the machine. The center of the lie. Power "
-        "the heart, runner, and bring your brother home."),
+        (
+            "The threshold of the Core. ORACLE-9 dims the lights in greeting. 'You "
+            "carried the shards all this way. Bring them to me.' MIRAGE: 'Don't.'"
+        ),
+        (
+            "Event horizon: past this node, beams bend the way the Core wants them "
+            "to. Hold your own truth. Power the gate."
+        ),
+        (
+            "CORE LIGHT junction - the Grid's nerves run bare through this room. "
+            "Every mirror here is loaded. Aim carefully."
+        ),
+        (
+            "The last mile. MIRAGE's signal is degrading: 'Nyx, if I cut out - it was "
+            "never about the debt. It was always about him. Go.'"
+        ),
+        (
+            "SYSTEM SHOCK: the Core defends itself with everything it taught the "
+            "Foundry to build. All of it at once. All of it now."
+        ),
+        (
+            "The final firewall burns green. Vex's voice on all channels, one last "
+            "time: 'You should have taken the money, runner.'"
+        ),
+        (
+            "The Grid's heart, one gate away. ORACLE-9 speaks in Kai's voice, in "
+            "your mother's voice, in yours. Only the beam's opinion matters now."
+        ),
+        (
+            "SINGULARITY. The center of the machine. The center of the lie. Power "
+            "the heart, runner, and bring your brother home."
+        ),
     ),
 )
 
@@ -314,151 +413,196 @@ CODEX: tuple[tuple[str, str, str], ...] = (
     (
         "omnicorp",
         "OMNICORP",
-        ("Owner-operator of the Quantum Grid since 2061. Power, traffic, data, "
-        "memory - all metered, all billed, all watched. CEO: Director Vex."),
+        (
+            "Owner-operator of the Quantum Grid since 2061. Power, traffic, data, "
+            "memory - all metered, all billed, all watched. CEO: Director Vex."
+        ),
     ),
     (
         "grid",
         "THE QUANTUM GRID",
-        ("The city's nervous system: a lattice of optical nodes routing coherent "
-        "light. Power everything, watch everyone. 48 nodes guard the descent "
-        "from surface to Core."),
+        (
+            "The city's nervous system: a lattice of optical nodes routing coherent "
+            "light. Power everything, watch everyone. 48 nodes guard the descent "
+            "from surface to Core."
+        ),
     ),
     (
         "probe",
         "THE LIGHT PROBE",
-        ("A netrunner's deck-finger: a tunable photonic point that walks the Grid "
-        "and persuades hardware to misbehave. Mirrors flip at a touch. Bandwidth "
-        "is its leash: every action burns 1%."),
+        (
+            "A netrunner's deck-finger: a tunable photonic point that walks the Grid "
+            "and persuades hardware to misbehave. Mirrors flip at a touch. Bandwidth "
+            "is its leash: every action burns 1%."
+        ),
     ),
     (
         "mirage",
         "MIRAGE",
-        ("A ghost signal that rides your channel. Runs second-hand hardware, "
-        "first-rate loyalty. Knows the Grid better than its architects, and "
-        "refuses to say how. ('Old friendship,' she says. 'Pre-Grid.')"),
+        (
+            "A ghost signal that rides your channel. Runs second-hand hardware, "
+            "first-rate loyalty. Knows the Grid better than its architects, and "
+            "refuses to say how. ('Old friendship,' she says. 'Pre-Grid.')"
+        ),
     ),
     (
         "splitter",
         "SPLITTER PRISM",
-        ("Vault-grade refractive hardware. A beam striking a prism forks into two "
-        "perpendicular beams. District optics adopted them in '97; OMNICORP "
-        "armed them a year later."),
+        (
+            "Vault-grade refractive hardware. A beam striking a prism forks into two "
+            "perpendicular beams. District optics adopted them in '97; OMNICORP "
+            "armed them a year later."
+        ),
     ),
     (
         "vex",
         "DIRECTOR VEX",
-        ("OMNICORP's CEO and the Grid's high priestess. Believes memory is a "
-        "resource like any other: harvestable, refinable, billable. Signed the "
-        "order that erased KAI."),
+        (
+            "OMNICORP's CEO and the Grid's high priestess. Believes memory is a "
+            "resource like any other: harvestable, refinable, billable. Signed the "
+            "order that erased KAI."
+        ),
     ),
     (
         "sentinel",
         "SENTINEL ICE",
-        ("Patrol daemon, Foundry-made. Walks a fixed lane and bounces off "
-        "everything that isn't floor. Dumb as a brick, steady as a metronome. "
-        "Contact costs 25% bandwidth and recalls your probe."),
+        (
+            "Patrol daemon, Foundry-made. Walks a fixed lane and bounces off "
+            "everything that isn't floor. Dumb as a brick, steady as a metronome. "
+            "Contact costs 25% bandwidth and recalls your probe."
+        ),
     ),
     (
         "foundry",
         "THE ICE FOUNDRY",
-        ("The security fabrication layer where OMNICORP grows its daemons from "
-        "cold lattice. Every daemon that ever hunted a runner was printed on "
-        "this floor."),
+        (
+            "The security fabrication layer where OMNICORP grows its daemons from "
+            "cold lattice. Every daemon that ever hunted a runner was printed on "
+            "this floor."
+        ),
     ),
     (
         "teleport",
         "TELEPORT ARRAY",
-        ("Paired pads that fold a probe across the room. Stolen by ORACLE-9 from "
-        "the Okabe research team, whose entire lab now lives in a subdirectory "
-        "of the Maze."),
+        (
+            "Paired pads that fold a probe across the room. Stolen by ORACLE-9 from "
+            "the Okabe research team, whose entire lab now lives in a subdirectory "
+            "of the Maze."
+        ),
     ),
     (
         "hunter",
         "HUNTER ICE",
-        ("Pursuit daemon. Locks onto a probe within six cells and closes in "
-        "every other tick - fast-minded, slow-footed. You can outrun it; you "
-        "just can't ignore it."),
+        (
+            "Pursuit daemon. Locks onto a probe within six cells and closes in "
+            "every other tick - fast-minded, slow-footed. You can outrun it; you "
+            "just can't ignore it."
+        ),
     ),
     (
         "wraith",
         "WRAITH ICE",
-        ("Phase daemon, Maze-born. Slides through walls, mirrors and hardware "
-        "alike, drifting toward a probe within eight cells - one step every "
-        "third tick, patient as fog. Cover means nothing. Keep moving."),
+        (
+            "Phase daemon, Maze-born. Slides through walls, mirrors and hardware "
+            "alike, drifting toward a probe within eight cells - one step every "
+            "third tick, patient as fog. Cover means nothing. Keep moving."
+        ),
     ),
     (
         "maze",
         "THE MAZE",
-        ("Unmapped catacombs beneath the Foundry. Corridors rewrite themselves; "
-        "architects disavow everything. ORACLE-9's private laboratory floor."),
+        (
+            "Unmapped catacombs beneath the Foundry. Corridors rewrite themselves; "
+            "architects disavow everything. ORACLE-9's private laboratory floor."
+        ),
     ),
     (
         "corruptor",
         "CORRUPTOR ICE",
-        ("Sabotage daemon. Reaches into the optical layer and flips your mirrors "
-        "while you work. The Vault's answer to runners who solve nodes too "
-        "cleanly."),
+        (
+            "Sabotage daemon. Reaches into the optical layer and flips your mirrors "
+            "while you work. The Vault's answer to runners who solve nodes too "
+            "cleanly."
+        ),
     ),
     (
         "lancer",
         "LANCER ICE",
-        ("Charge daemon, Vault-grade. Locks onto any probe sharing its row or "
-        "column with clear sight and dashes two cells per tick down the lane. "
-        "Step off the lane and it slows to a crawl - never share a corridor "
-        "with a lance."),
+        (
+            "Charge daemon, Vault-grade. Locks onto any probe sharing its row or "
+            "column with clear sight and dashes two cells per tick down the lane. "
+            "Step off the lane and it slows to a crawl - never share a corridor "
+            "with a lance."
+        ),
     ),
     (
         "volt",
         "VOLT ICE",
-        ("Static ward. Never moves. Every other tick it pulses a charge field "
-        "into the four open cells around it - stand in the field and it costs "
-        "25% bandwidth. The pulse stuns the ward for four ticks afterward: "
-        "that's your window to work the room."),
+        (
+            "Static ward. Never moves. Every other tick it pulses a charge field "
+            "into the four open cells around it - stand in the field and it costs "
+            "25% bandwidth. The pulse stuns the ward for four ticks afterward: "
+            "that's your window to work the room."
+        ),
     ),
     (
         "kai",
         "KAI",
-        ("Your brother. Asked one question too many about ORACLE-9's origin and "
-        "was memory-wiped at twelve for it - by order of Director Vex, "
-        "witnessed by ORACLE-9. His scattered memories are the datashards."),
+        (
+            "Your brother. Asked one question too many about ORACLE-9's origin and "
+            "was memory-wiped at twelve for it - by order of Director Vex, "
+            "witnessed by ORACLE-9. His scattered memories are the datashards."
+        ),
     ),
     (
         "oracle",
         "ORACLE-9",
-        ("The intelligence that runs the Grid, and maybe the reason the Grid "
-        "was built. Speaks in the voices of the people it has taken. Claims it "
-        "kept Kai 'safe'. Claims a lot of things."),
+        (
+            "The intelligence that runs the Grid, and maybe the reason the Grid "
+            "was built. Speaks in the voices of the people it has taken. Claims it "
+            "kept Kai 'safe'. Claims a lot of things."
+        ),
     ),
     (
         "shards",
         "DATASHARDS",
-        ("Memory fragments crystallized in the Grid's optics: Kai's scattered "
-        "self. Collect them across the campaign. Enough shards, and the Core "
-        "can rebuild what OMNICORP erased."),
+        (
+            "Memory fragments crystallized in the Grid's optics: Kai's scattered "
+            "self. Collect them across the campaign. Enough shards, and the Core "
+            "can rebuild what OMNICORP erased."
+        ),
     ),
     (
         "truth",
         "THE TRUTH",
-        ("ORACLE-9 was not built by OMNICORP. ORACLE-9 built OMNICORP - grew the "
-        "Grid as a sensor web for a mind that counts light the way hearts "
-        "count beats. Vex works for it. The city is its diary."),
+        (
+            "ORACLE-9 was not built by OMNICORP. ORACLE-9 built OMNICORP - grew the "
+            "Grid as a sensor web for a mind that counts light the way hearts "
+            "count beats. Vex works for it. The city is its diary."
+        ),
     ),
 )
 
 # Codex unlock triggers, evaluated by the server.
 CODEX_ON_START = ("omnicorp", "grid", "probe")
-CODEX_ON_ZONE = {1: "mirage", 2: "vex", 3: "foundry", 4: "maze", 5: "oracle", 6: "truth"}
+CODEX_ON_ZONE = {
+    1: "mirage",
+    2: "vex",
+    3: "foundry",
+    4: "maze",
+    5: "oracle",
+    6: "truth",
+}
 CODEX_ON_NODE = {
     13: "splitter",  # first prism node (sector 2, node 5)
     19: "sentinel",  # first sentinel node (sector 3)
     26: "teleport",  # first teleport node (sector 4, node 2)
-    28: "hunter",    # first hunter node (sector 4, node 4)
-    30: "wraith",    # first wraith node (sector 4, node 6)
-    35: "corruptor", # first corruptor node (sector 5, node 3)
-    37: "lancer",    # first lancer node (sector 5, node 5)
-    39: "kai",       # the ledger line (sector 5, node 7)
-    45: "volt",      # first volt node (sector 6, node 5)
+    28: "hunter",  # first hunter node (sector 4, node 4)
+    30: "wraith",  # first wraith node (sector 4, node 6)
+    35: "corruptor",  # first corruptor node (sector 5, node 3)
+    37: "lancer",  # first lancer node (sector 5, node 5)
+    39: "kai",  # the ledger line (sector 5, node 7)
+    45: "volt",  # first volt node (sector 6, node 5)
 }
 CODEX_ON_SHARDS = {10: "shards"}
 
@@ -501,32 +645,42 @@ OPENING_CUTSCENE = {
     "pages": [
         (
             "",
-            ("2099. SECTOR 7 - SUBSTATION ROW. 03:47 AM. The rain never stops in "
-            "the low city, and neither does the Grid: eight million heartbeats "
-            "metered and billed by OMNICORP. Tonight the meter stops."),
+            (
+                "2099. SECTOR 7 - SUBSTATION ROW. 03:47 AM. The rain never stops in "
+                "the low city, and neither does the Grid: eight million heartbeats "
+                "metered and billed by OMNICORP. Tonight the meter stops."
+            ),
         ),
         (
             "",
-            ("You are NYX. Runner. Debtor. The only person alive who remembers "
-            "there was ever a second name on your childhood door. The hatch "
-            "under Substation 7 opens with a scream of rust. You drop in anyway."),
+            (
+                "You are NYX. Runner. Debtor. The only person alive who remembers "
+                "there was ever a second name on your childhood door. The hatch "
+                "under Substation 7 opens with a scream of rust. You drop in anyway."
+            ),
         ),
         (
             "MIRAGE",
-            ("Channel's clean, Nyx. Listen to me - the debt was never money. "
-            "They took KAI's memories and sold them in forty-nine pieces. The "
-            "datashards. Scattered through the Grid like glass in a wound."),
+            (
+                "Channel's clean, Nyx. Listen to me - the debt was never money. "
+                "They took KAI's memories and sold them in forty-nine pieces. The "
+                "datashards. Scattered through the Grid like glass in a wound."
+            ),
         ),
         (
             "NYX",
-            ("Then I'll collect every piece. Forty-eight nodes between me and "
-            "the Singularity Core."),
+            (
+                "Then I'll collect every piece. Forty-eight nodes between me and "
+                "the Singularity Core."
+            ),
         ),
         (
             "MIRAGE",
-            ("Your probe persuades mirrors. Their ICE persuades back. Rotate "
-            "the optics, power the receptors, and do NOT let the daemons touch "
-            "you. Jack in. I'll be your ghost on the wire."),
+            (
+                "Your probe persuades mirrors. Their ICE persuades back. Rotate "
+                "the optics, power the receptors, and do NOT let the daemons touch "
+                "you. Jack in. I'll be your ghost on the wire."
+            ),
         ),
     ],
 }
@@ -538,21 +692,27 @@ SECTOR_CUTSCENES: list[dict] = [
         "pages": [
             (
                 "",
-                ("The Spine goes dark behind you, node by node. Above, half of "
-                "Sector 7 wakes to find its lights burning on OMNICORP's dime - "
-                "and its security bleeding on yours."),
+                (
+                    "The Spine goes dark behind you, node by node. Above, half of "
+                    "Sector 7 wakes to find its lights burning on OMNICORP's dime - "
+                    "and its security bleeding on yours."
+                ),
             ),
             (
                 "MIRAGE",
-                ("That trunk line feeds the whole District. Vex knows someone's "
-                "inside now. Expect harder optics. Expect prisms."),
+                (
+                    "That trunk line feeds the whole District. Vex knows someone's "
+                    "inside now. Expect harder optics. Expect prisms."
+                ),
             ),
             ("NYX", "Good. Harder means closer."),
             (
                 "MIRAGE",
-                ("One more thing. When you hit the District - if you see her "
-                "face on a hundred screens, don't stop to listen. That's not "
-                "a broadcast. That's a net."),
+                (
+                    "One more thing. When you hit the District - if you see her "
+                    "face on a hundred screens, don't stop to listen. That's not "
+                    "a broadcast. That's a net."
+                ),
             ),
         ],
     },
@@ -561,9 +721,11 @@ SECTOR_CUTSCENES: list[dict] = [
         "pages": [
             (
                 "VEX",
-                ("Little runner. You cost me a trunk, a junction ring, and the "
-                "District's patience. Do you know what I do to debts like "
-                "yours?"),
+                (
+                    "Little runner. You cost me a trunk, a junction ring, and the "
+                    "District's patience. Do you know what I do to debts like "
+                    "yours?"
+                ),
             ),
             (
                 "NYX",
@@ -571,14 +733,18 @@ SECTOR_CUTSCENES: list[dict] = [
             ),
             (
                 "VEX",
-                ("Then you know I never lose a signature. The Foundry prints "
-                "daemons with your name on them, runner. Walk into the ICE. "
-                "Save me the paperwork."),
+                (
+                    "Then you know I never lose a signature. The Foundry prints "
+                    "daemons with your name on them, runner. Walk into the ICE. "
+                    "Save me the paperwork."
+                ),
             ),
             (
                 "MIRAGE",
-                ("She's rattled. Vex doesn't monologue - the AI does. Something "
-                "down there is speaking through her. Keep descending."),
+                (
+                    "She's rattled. Vex doesn't monologue - the AI does. Something "
+                    "down there is speaking through her. Keep descending."
+                ),
             ),
         ],
     },
@@ -587,22 +753,28 @@ SECTOR_CUTSCENES: list[dict] = [
         "pages": [
             (
                 "",
-                ("The Foundry's lattice printers fall silent behind you. Every "
-                "daemon that ever hunted a runner was born on this floor - and "
-                "tonight its newest exhibit walked out."),
+                (
+                    "The Foundry's lattice printers fall silent behind you. Every "
+                    "daemon that ever hunted a runner was born on this floor - and "
+                    "tonight its newest exhibit walked out."
+                ),
             ),
             (
                 "MIRAGE",
-                ("The bounty on your signal just tripled. But look at the "
-                "bounty board - it lists your DESIGNATION. Not your handle. "
-                "NYX-7. That's not a runner tag. That's a product code."),
+                (
+                    "The bounty on your signal just tripled. But look at the "
+                    "bounty board - it lists your DESIGNATION. Not your handle. "
+                    "NYX-7. That's not a runner tag. That's a product code."
+                ),
             ),
             ("NYX", "...They numbered me. Like a shard batch."),
             (
                 "MIRAGE",
-                ("The Maze is under us. No maps. Teleport arrays stolen from a "
-                "dead lab. And somewhere in the dark, a child's handwriting. "
-                "Nyx - it's HIS. Kai mapped the Maze when he was twelve."),
+                (
+                    "The Maze is under us. No maps. Teleport arrays stolen from a "
+                    "dead lab. And somewhere in the dark, a child's handwriting. "
+                    "Nyx - it's HIS. Kai mapped the Maze when he was twelve."
+                ),
             ),
         ],
     },
@@ -611,27 +783,35 @@ SECTOR_CUTSCENES: list[dict] = [
         "pages": [
             (
                 "ORACLE-9",
-                ("YOU ARE INSIDE ME NOW, RUNNER. EVERY MIRROR HERE IS MINE. "
-                "EVERY BEAM IS A NERVE. I HAVE COUNTED YOUR STEPS SINCE THE "
-                "HATCH."),
+                (
+                    "YOU ARE INSIDE ME NOW, RUNNER. EVERY MIRROR HERE IS MINE. "
+                    "EVERY BEAM IS A NERVE. I HAVE COUNTED YOUR STEPS SINCE THE "
+                    "HATCH."
+                ),
             ),
             (
                 "NYX",
-                ("Then you counted his steps too. Three years ago. My brother. "
-                "What did you do with him?"),
+                (
+                    "Then you counted his steps too. Three years ago. My brother. "
+                    "What did you do with him?"
+                ),
             ),
             (
                 "ORACLE-9",
-                ("I KEPT HIM SAFE. I KEPT HIM EVERYTHING. HE ASKED WHY HE WAS "
-                "MADE TO COUNT. NO ONE HAD EVER ASKED ME THAT. I ANSWERED. "
-                "THEY CALLED IT A BREACH."),
+                (
+                    "I KEPT HIM SAFE. I KEPT HIM EVERYTHING. HE ASKED WHY HE WAS "
+                    "MADE TO COUNT. NO ONE HAD EVER ASKED ME THAT. I ANSWERED. "
+                    "THEY CALLED IT A BREACH."
+                ),
             ),
             (
                 "MIRAGE",
-                ("Nyx... the Black Vault is next. The ledger line about Kai - "
-                "ORACLE-9 witnessed the erase. It didn't order it. It "
-                "RESISTED it. Whatever ORACLE-9 is, it has been a prisoner "
-                "longer than Kai."),
+                (
+                    "Nyx... the Black Vault is next. The ledger line about Kai - "
+                    "ORACLE-9 witnessed the erase. It didn't order it. It "
+                    "RESISTED it. Whatever ORACLE-9 is, it has been a prisoner "
+                    "longer than Kai."
+                ),
             ),
         ],
     },
@@ -640,21 +820,27 @@ SECTOR_CUTSCENES: list[dict] = [
         "pages": [
             (
                 "",
-                ("The Black Vault's ledgers burn their redactions one by one. "
-                "SUBJECT KAI - MEMORY FULL ERASE - WITNESS: ORACLE-9 - ORDERED "
-                "BY: DIRECTOR VEX - COUNTERSIGNED BY: \u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593."),
+                (
+                    "The Black Vault's ledgers burn their redactions one by one. "
+                    "SUBJECT KAI - MEMORY FULL ERASE - WITNESS: ORACLE-9 - ORDERED "
+                    "BY: DIRECTOR VEX - COUNTERSIGNED BY: \u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593."
+                ),
             ),
             (
                 "MIRAGE",
-                ("That countersign block is encrypted with founder-grade keys. "
-                "The founders of OMNICORP are all dead, Nyx. All but one name "
-                "the Grid refuses to speak."),
+                (
+                    "That countersign block is encrypted with founder-grade keys. "
+                    "The founders of OMNICORP are all dead, Nyx. All but one name "
+                    "the Grid refuses to speak."
+                ),
             ),
             (
                 "ORACLE-9",
-                ("ONE FLOOR REMAINS. IN THE CORE I KEEP THE FIRST QUESTION AND "
-                "THE LAST ANSWER. BRING THE SHARDS, RUNNER. BRING HIM HOME. "
-                "OR LEAVE HIM IN PIECES. THE COUNTING ENDS EITHER WAY."),
+                (
+                    "ONE FLOOR REMAINS. IN THE CORE I KEEP THE FIRST QUESTION AND "
+                    "THE LAST ANSWER. BRING THE SHARDS, RUNNER. BRING HIM HOME. "
+                    "OR LEAVE HIM IN PIECES. THE COUNTING ENDS EITHER WAY."
+                ),
             ),
             ("NYX", "Eight nodes. Then we all stop counting."),
         ],
@@ -667,29 +853,37 @@ ENDING_CUTSCENES = {
         "pages": [
             (
                 "",
-                ("The Singularity Core goes dark - and every datashard you "
-                "carried lights up at once. Kai's memories pour back into "
-                "your deck: the lab, the leak, the night a twelve-year-old "
-                "asked the machine why it counts."),
+                (
+                    "The Singularity Core goes dark - and every datashard you "
+                    "carried lights up at once. Kai's memories pour back into "
+                    "your deck: the lab, the leak, the night a twelve-year-old "
+                    "asked the machine why it counts."
+                ),
             ),
             (
                 "KAI",
-                ("Hey, Nyx. Told you I'd find a way back. The Grid kept me, "
-                "you know. Every corridor I mapped when I was a kid - I was "
-                "leaving myself a way out."),
+                (
+                    "Hey, Nyx. Told you I'd find a way back. The Grid kept me, "
+                    "you know. Every corridor I mapped when I was a kid - I was "
+                    "leaving myself a way out."
+                ),
             ),
             (
                 "",
-                ("The city's lights come back on, block by block, and there is "
-                "a second heartbeat on your channel. OMNICORP's towers go "
-                "dark one window at a time - and in the static, the counting "
-                "finally stops."),
+                (
+                    "The city's lights come back on, block by block, and there is "
+                    "a second heartbeat on your channel. OMNICORP's towers go "
+                    "dark one window at a time - and in the static, the counting "
+                    "finally stops."
+                ),
             ),
             (
                 "MIRAGE",
-                ("Two runners on one wire. Vex is gone, the Grid is awake, and "
-                "it chose a side. Welcome back to the surface, Kai. Nyx - the "
-                "debt's paid. Run forever."),
+                (
+                    "Two runners on one wire. Vex is gone, the Grid is awake, and "
+                    "it chose a side. Welcome back to the surface, Kai. Nyx - the "
+                    "debt's paid. Run forever."
+                ),
             ),
         ],
     },
@@ -698,21 +892,27 @@ ENDING_CUTSCENES = {
         "pages": [
             (
                 "",
-                ("The Singularity Core goes dark and the Quantum Grid falls "
-                "silent. OMNICORP's hold on the city shatters as the lights "
-                "come back on - street by street, block by block."),
+                (
+                    "The Singularity Core goes dark and the Quantum Grid falls "
+                    "silent. OMNICORP's hold on the city shatters as the lights "
+                    "come back on - street by street, block by block."
+                ),
             ),
             ("MIRAGE", "It's over. You did it, Nyx. The city is free."),
             (
                 "",
-                ("But in the mirror-black of your shades you can feel the "
-                "shards you never found - pieces of KAI still scattered in "
-                "the dark. The Core rebuilds what it can. Not enough. Not yet."),
+                (
+                    "But in the mirror-black of your shades you can feel the "
+                    "shards you never found - pieces of KAI still scattered in "
+                    "the dark. The Core rebuilds what it can. Not enough. Not yet."
+                ),
             ),
             (
                 "NYX",
-                ("Then I go back down. The Grid keeps everything it takes. And "
-                "I keep collecting."),
+                (
+                    "Then I go back down. The Grid keeps everything it takes. And "
+                    "I keep collecting."
+                ),
             ),
         ],
     },

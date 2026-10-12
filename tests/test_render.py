@@ -153,7 +153,13 @@ def test_settings_screen_renders_and_marks_selection():
     s = dict(DEFAULT_SETTINGS)
     out = R.render_settings(s, 0, 80, 24)
     text = plain(out)
-    for label in ("SOUND", "SCREEN SHAKE", "FLASH EFFECTS", "BEAM SHIMMER", "TEXT SPEED"):
+    for label in (
+        "SOUND",
+        "SCREEN SHAKE",
+        "FLASH EFFECTS",
+        "BEAM SHIMMER",
+        "TEXT SPEED",
+    ):
         assert label in text
     assert ">" in text and "FULL" in text and "NORMAL" in text
 
@@ -162,7 +168,9 @@ def test_vfx_toggles_off():
     game = Game(0, 100)
     game.flash[game.layout.receptors[0]] = 3
     game.shake = 3
-    out = R.render_frame(game, 80, 24, vfx={"shake": False, "flashes": False, "shimmer": False})
+    out = R.render_frame(
+        game, 80, 24, vfx={"shake": False, "flashes": False, "shimmer": False}
+    )
     text = plain(out)
     assert "\u2726" not in text  # flashes off
     assert f"{R.ESC}[{R.RED}m=" not in out  # no red alert rule
