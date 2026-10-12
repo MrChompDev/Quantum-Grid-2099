@@ -50,6 +50,7 @@ from .render import (
     render_level_complete,
     render_level_intro,
     render_node_select,
+    render_records,
     render_save_menu,
     render_sector_clear,
     render_settings,
@@ -64,6 +65,10 @@ ARROW_MAP = {"A": "w", "B": "s", "C": "d", "D": "a"}
 QUIT = None  # EOF, Ctrl-C or 'q'
 NOOP = ""  # ignored input
 _TIMEOUT = object()  # animation tick expired (distinct from QUIT)
+
+
+class QuitSignal(Exception):
+    """Raised when a milestone cutscene sees the player disconnect."""
 
 
 class QuantumGridServer(asyncssh.SSHServer):
@@ -350,6 +355,7 @@ class Session:
                         _total_shards_in_game() > 0
                         and banked >= SHARDS_FOR_TRUE_ENDING * _total_shards_in_game()
                     )
+                    self._award_records("victory", true_end)
                     ending_cut = ENDING_CUTSCENES["true" if true_end else "standard"]
                     result = await self._play_cutscene(ending_cut)
                     if result == "quit":
@@ -403,6 +409,10 @@ class Session:
                     self.save["unlocked"] = len(LEVELS) - 1
                 save_mod.store(self.username, self.save)
                 return
+            if key == "r":
+                self.player.sfx("menu")
+                await self._records_screen()
+                continue
             if key in ("\r", "\n", " "):
                 self.player.sfx("menu")
                 return
@@ -506,15 +516,64 @@ class Session:
         save_mod.store(self.username, self.save)
 
     async def _leaderboard_screen(self) -> None:
+        from .lore import CODEX_ON_EVENT
+
         while True:
             self.width, self.height = self._frame_size()
             self.write(
                 CLEAR
                 + render_leaderboard(self.save, self.username, self.width, self.height)
             )
+            codex_key = CODEX_ON_EVENT.get("first_board")
+            if codex_key:
+                self.unlock_codex(codex_key)
             key = await self.read_key()
             if key is QUIT or key in ("q", "l", "c"):
                 return
+
+    async def _records_screen(self) -> None:
+        while True:
+            self.width, self.height = self._frame_size()
+            self.write(CLEAR + render_records(self.save, self.width, self.height))
+            key = await self.read_key()
+            if key is QUIT or key in ("q", "r", "c"):
+                return
+
+    async def _event_cutscene(self, key: str) -> None:
+        """Play a one-time milestone cutscene (first strike, first EMP,
+        first wraith...). Remembered in save["scenes_seen"]; unlocks its
+        codex entry, if any."""
+        from .lore import CODEX_ON_EVENT, EVENT_CUTSCENES
+
+        seen = self.save.setdefault("scenes_seen", [])
+        if key in seen:
+            return
+        seen.append(key)
+        codex_key = CODEX_ON_EVENT.get(key)
+        if codex_key:
+            self.unlock_codex(codex_key)
+        save_mod.store(self.username, self.save)
+        scene = EVENT_CUTSCENES.get(key)
+        if scene is None:
+            return
+        self._fx_game = None  # freeze the idle loop during the scene
+        result = await self._play_cutscene(scene)
+        self.player.sfx("menu")
+        if result == "quit":
+            raise QuitSignal()
+
+    def _award_records(self, event: str, game=None) -> None:
+        """Merge newly earned records into the save; blip on first award."""
+        from .lore import evaluate_records
+
+        new_keys = evaluate_records(self.save, event, game)
+        if not new_keys:
+            return
+        records = self.save.setdefault("records", [])
+        records.extend(new_keys)
+        save_mod.store(self.username, self.save)
+        if self.player.sfx_on:
+            self.player.sfx("unlock")
 
     async def _play_daily(self) -> str | None:
         """THE DAILY GAUNTLET: one shared node per day, its own board.
@@ -537,6 +596,7 @@ class Session:
             bandwidth_start=data.get("bandwidth_start", BANDWIDTH_MAX),
             bandwidth_floor=data.get("bandwidth_floor", 0),
         )
+        await self._event_cutscene("first_daily")
         daily = self.save.setdefault("daily", {})
         rec = daily.setdefault(key, {"attempts": 0, "best": 0, "won": False})
         rec["attempts"] += 1
@@ -655,6 +715,7 @@ class Session:
                     save_mod.store(self.username, self.save)
                     self._fx_game = None
                     self.player.sfx("unlock")
+                    self._award_records("daily_win")
                     if (
                         await self._show_animated(
                             lambda f, r=rank: render_daily_complete(
@@ -677,6 +738,7 @@ class Session:
                     self.session_deaths += 1
                     self.save["deaths"] = self.save.get("deaths", 0) + 1
                     save_mod.store(self.username, self.save)
+                    await self._event_cutscene("first_death")
                     if (
                         await self._show_animated(
                             lambda f: render_game_over(game, self.width, self.height, f)
@@ -821,6 +883,9 @@ class Session:
             no_ice=self.no_ice,
         )
         self._last_game = game
+        # First-ever encounter with a daemon class: story beat + dossier.
+        for _, kind in game.layout.enemies:
+            await self._event_cutscene(f"meet_{kind}")
         self.width, self.height = self._frame_size()
         self.write(
             CLEAR + render_level_intro(defn, index, bandwidth, self.width, self.height)
@@ -881,6 +946,8 @@ class Session:
                         self.total_actions += 1
                         self.play_event(game.event)
                         game.event = None
+                        await self._event_cutscene("first_emp")
+                        self._award_records("emp", game)
                     self.write(
                         render_frame(
                             game,
@@ -920,8 +987,11 @@ class Session:
                     self.total_actions += 1
                     self.play_event(game.event)
                     game.event = None
+                    if game.strikes == 1:
+                        await self._event_cutscene("first_ice")
                 if game.check_win():
                     self.bank_win(index, game)
+                    self._award_records("win", game)
                     self.session_score = self.save.get("total_score", 0)
                     self.bandwidth = game.finish_level()
                     self._fx_game = None  # stop the idle VFX loop
@@ -971,6 +1041,7 @@ class Session:
                     self.session_deaths += 1
                     self.save["deaths"] = self.save.get("deaths", 0) + 1
                     save_mod.store(self.username, self.save)
+                    await self._event_cutscene("first_death")
                     key = await self._show_animated(
                         lambda f: render_game_over(game, self.width, self.height, f)
                     )

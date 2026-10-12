@@ -35,6 +35,9 @@ def default_save() -> dict:
         "codex": [],
         "endings": [],
         "deaths": 0,
+        "records": [],  # earned record keys (see lore.RECORDS)
+        "scenes_seen": [],  # one-time event cutscenes already played
+        "daily": {},  # day key (YYYYMMDD) -> {"attempts", "best", "won"}
         "settings": dict(DEFAULT_SETTINGS),
     }
 

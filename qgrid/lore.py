@@ -581,6 +581,39 @@ CODEX: tuple[tuple[str, str, str], ...] = (
             "count beats. Vex works for it. The city is its diary."
         ),
     ),
+    (
+        "emp",
+        "THE EMP ARRAY",
+        (
+            "Probe-mounted pulse capacitor: one burst per descent, ten percent of "
+            "bandwidth a shot. Stuns every daemon within two cells for four ticks. "
+            "The schematic is signed 'K.' - a twelve-year-old designed the safety "
+            "interlock that keeps it from frying the probe's own optics. OMNICORP "
+            "shipped it anyway. They never asked who K. was."
+        ),
+    ),
+    (
+        "wire",
+        "THE WIRE",
+        (
+            "The runner grapevine that lives in the Grid's abandoned channels. "
+            "Every descent is watched, scored, remembered: best career counts, "
+            "furthest floors, daily gauntlet times. The Wire doesn't care about "
+            "your handle - only the light you leave behind. MIRAGE: 'Run well. "
+            "The Wire keeps count even when you wish it wouldn't.'"
+        ),
+    ),
+    (
+        "gauntlet",
+        "THE DAILY GAUNTLET",
+        (
+            "Every midnight the Grid opens one node to every runner at once - "
+            "same layout, same daemons, same clock. Nobody knows who re-seeds it. "
+            "The smart money says ORACLE-9, running an experiment on us. The "
+            "Wire says it's a memorial: one floor a day where every runner alive "
+            "walks the same corridors, together, apart."
+        ),
+    ),
 )
 
 # Codex unlock triggers, evaluated by the server.
@@ -604,6 +637,12 @@ CODEX_ON_NODE = {
     39: "kai",  # the ledger line (sector 5, node 7)
     45: "volt",  # first volt node (sector 6, node 5)
 }
+# Codex keys unlocked by one-time events (see EVENT_CUTSCENES + server).
+CODEX_ON_EVENT = {
+    "first_emp": "emp",
+    "first_board": "wire",
+    "first_daily": "gauntlet",
+}
 CODEX_ON_SHARDS = {10: "shards"}
 
 
@@ -616,6 +655,64 @@ SETTINGS_SCHEMA: dict[str, tuple[str, ...]] = {
     "shimmer": ("on", "off"),
     "text_speed": ("normal", "fast", "instant"),
 }
+
+# --------------------------------------------------------------- records
+# Career achievements, evaluated by lore.evaluate_records(save, event,
+# game) and rendered on the RECORDS screen. Keys persist in
+# save["records"]; titles are shown with the wire's own bravado.
+
+RECORDS: tuple[tuple[str, str, str], ...] = (
+    (
+        "first_descent",
+        "FIRST DESCENT",
+        "Clear your first Grid node. The wire notices everyone eventually.",
+    ),
+    (
+        "clean_room",
+        "CLEAN ROOM",
+        "Clear an ICE node without a single strike. The daemons never touched you.",
+    ),
+    (
+        "survivor",
+        "BLOODIED BUT UP",
+        "Clear a node after taking three or more strikes. The debt collector gets paid anyway.",
+    ),
+    (
+        "emp_jockey",
+        "EMP JOCKEY",
+        "Catch two or more daemons in a single EMP burst. Kai's interlock hums.",
+    ),
+    (
+        "shard_10",
+        "SHARD BEARER",
+        "Bank ten of Kai's datashards. He's getting louder in the static.",
+    ),
+    (
+        "deep_runner",
+        "DEEP RUNNER",
+        "Fight your way into the Black Vault - sector 5 territory.",
+    ),
+    (
+        "core_bound",
+        "CORE BOUND",
+        "Stand at the threshold of the Singularity Core.",
+    ),
+    (
+        "liberator",
+        "CITY LIBERATOR",
+        "Finish the campaign. The lights come back on.",
+    ),
+    (
+        "true_ending",
+        "THE COUNTING ENDS",
+        "Bank 90% of the shards and bring KAI all the way home.",
+    ),
+    (
+        "daily_star",
+        "GAUNTLET RUNNER",
+        "Clear a daily gauntlet. One layout, one day, every runner.",
+    ),
+)
 
 DEFAULT_SETTINGS: dict[str, str] = {k: v[0] for k, v in SETTINGS_SCHEMA.items()}
 
@@ -634,6 +731,41 @@ def cycle_setting(settings: dict, key: str) -> str:
     idx = values.index(settings[key])
     settings[key] = values[(idx + 1) % len(values)]
     return settings[key]
+
+
+def evaluate_records(save: dict, event: str, game=None) -> list[str]:
+    """Return the record keys newly earned by `event`, given the save.
+
+    Events: 'win' (node cleared, `game` = the Game), 'victory' (campaign
+    finished; pass game=True for the true ending, False otherwise),
+    'daily_win'. Pure function - the caller merges the returned keys
+    into save["records"].
+    """
+    earned = set(save.get("records", []))
+    have = lambda k: k not in earned
+    out: list[str] = []
+    banked = sum(len(v) for v in save.get("shards", {}).values())
+    unlocked = save.get("unlocked", 0)
+
+    def grant(key: str, cond: bool) -> None:
+        if cond and have(key):
+            out.append(key)
+
+    if event == "win" and game is not None:
+        grant("first_descent", unlocked >= 1)
+        grant("clean_room", game.strikes == 0)
+        grant("survivor", game.strikes >= 3)
+        grant("shard_10", banked >= 10)
+        grant("deep_runner", unlocked >= 24)
+        grant("core_bound", unlocked >= 40)
+    elif event == "emp" and game is not None:
+        grant("emp_jockey", getattr(game, "last_emp_hits", 0) >= 2)
+    elif event == "victory":
+        grant("liberator", True)
+        grant("true_ending", game is True)
+    elif event == "daily_win":
+        grant("daily_star", True)
+    return out
 
 
 # ------------------------------------------------------------- cutscenes
@@ -912,6 +1044,222 @@ ENDING_CUTSCENES = {
                 (
                     "Then I go back down. The Grid keeps everything it takes. And "
                     "I keep collecting."
+                ),
+            ),
+        ],
+    },
+}
+
+
+# --------------------------------------------------------- event cutscenes
+# One-time story beats, played the first time their trigger fires and
+# remembered in save["scenes_seen"]. Same page format as the campaign
+# cutscenes.
+
+EVENT_CUTSCENES: dict[str, dict] = {
+    "meet_sentinel": {
+        "title": "SIGNAL LOG // PATROL CLASS",
+        "pages": [
+            (
+                "",
+                (
+                    "It comes around the corner like a bill collector: SENTINEL "
+                    "class ICE, walking its lane with the patience of something "
+                    "that has never once been in a hurry."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "Sentinels never chase - they patrol. Learn the walk cycle, "
+                    "stay off the lane, work around it. Dumb as a brick, steady "
+                    "as a metronome. Respect the rhythm and it will never even "
+                    "know you're there."
+                ),
+            ),
+        ],
+    },
+    "meet_hunter": {
+        "title": "SIGNAL LOG // EYES ON YOU",
+        "pages": [
+            (
+                "",
+                (
+                    "The channel goes cold in a way that isn't temperature. "
+                    "Somewhere behind you, HUNTER class ICE has flagged your "
+                    "signal - and flagged signals don't get unflagged."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "Hunters close in every time you act, but they're half your "
+                    "speed. Outrun them, break line of sight, keep moving. And "
+                    "Nyx - if one does catch you, the strike stuns it. Sometimes "
+                    "the toll is the way through."
+                ),
+            ),
+        ],
+    },
+    "meet_corruptor": {
+        "title": "SIGNAL LOG // SABOTAGE CLASS",
+        "pages": [
+            (
+                "",
+                (
+                    "Your freshly rotated mirror flips back on its own. Then "
+                    "another. Something is in the optical layer with you - "
+                    "CORRUPTOR class, reaching into hardware with dead-cold "
+                    "fingers."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "It flips your optics while you work, then backs off for a "
+                    "few ticks before it hunts a new one. But here's the trick, "
+                    "Nyx: a mirror you're touching is protected. Hold your "
+                    "optics. Make it wait. Make it WATCH."
+                ),
+            ),
+        ],
+    },
+    "first_ice": {
+        "title": "SIGNAL LOG // FIRST CONTACT",
+        "pages": [
+            (
+                "",
+                (
+                    "The daemon's lattice grazes the probe and a quarter of your "
+                    "bandwidth evaporates in a scream of static. But look - the "
+                    "strike knocks the daemon back and shocks it dormant."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "Stunned ICE is walkable, Nyx. Four ticks of quiet. Sometimes "
+                    "the fastest way through a patrol is THROUGH it - the strike "
+                    "is the toll. Burn bandwidth like it's borrowed."
+                ),
+            ),
+            ("NYX", "It is borrowed. Everything here is."),
+        ],
+    },
+    "first_emp": {
+        "title": "SIGNAL LOG // THE CAPACITOR",
+        "pages": [
+            (
+                "",
+                (
+                    "The EMP array discharges and every daemon in reach freezes "
+                    "mid-thought, lattice crystallized in place. The pulse "
+                    "capacitor needs a node's downtime to recharge - one burst "
+                    "per descent."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "That safety interlock in the schematic? The one that keeps "
+                    "the burst from cooking your own optics? A kid designed it. "
+                    "Neat, huh? Your brother's homework is saving your life."
+                ),
+            ),
+            (
+                "NYX",
+                "Then he's still teaching me. Save the window, Nyx. Spend it smart.",
+            ),
+        ],
+    },
+    "meet_wraith": {
+        "title": "SIGNAL LOG // SOMETHING IN THE WALL",
+        "pages": [
+            (
+                "",
+                (
+                    "The pressure in the corridor changes first. Then you see it: "
+                    "a shape sliding through solid lattice like the wall is a "
+                    "suggestion. WRAITH class. The Maze grew its own daemon."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "Nyx - cover means NOTHING to that thing. It doesn't chase, "
+                    "it drifts. One step every three ticks, patient as fog. Do "
+                    "not stand still near a wraith. Do not trust a wall."
+                ),
+            ),
+            (
+                "ORACLE-9",
+                "IT LEARNED THE MAZE FROM HIM. I ONLY SHOWED IT THE MAPS.",
+            ),
+        ],
+    },
+    "meet_lancer": {
+        "title": "SIGNAL LOG // THE LANCE",
+        "pages": [
+            (
+                "",
+                (
+                    "Something at the end of the corridor goes very still. Then "
+                    "the stillness charges - two cells per tick, dead straight "
+                    "down your lane. LANCER class. Vault-grade escort hardware."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "It can only see in straight lines. Step OFF its row or "
+                    "column and it slows to a crawl. Never share a corridor "
+                    "with a lance, Nyx. Even a wall between you isn't safe if "
+                    "the lane bends around it."
+                ),
+            ),
+        ],
+    },
+    "meet_volt": {
+        "title": "SIGNAL LOG // STATIC WARD",
+        "pages": [
+            (
+                "",
+                (
+                    "The node hums with a charge that has no business in an "
+                    "optical layer. A VOLT ward sits at the center of it, "
+                    "pulsing a kill-field into the four cells around it - "
+                    "every other tick, patient as a metronome."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "The ward never moves, but the four cells beside it belong "
+                    "to it. Watch the glint, walk on the off-beat - or bait a "
+                    "pulse and use the four ticks while it recharges. The "
+                    "Foundry's poetry, Nyx. Read it fast."
+                ),
+            ),
+        ],
+    },
+    "first_death": {
+        "title": "SIGNAL LOG // FLATLINE",
+        "pages": [
+            (
+                "",
+                (
+                    "Bandwidth zero. The probe's carrier wave collapses and the "
+                    "Grid spits you out on the surface, rain-soaked, pulse "
+                    "hammering. Your progress is saved. Your pride isn't."
+                ),
+            ),
+            (
+                "MIRAGE",
+                (
+                    "Hey. Look at me. Every runner the Wire remembers has a "
+                    "death count. The daemons don't remember yours - the Grid "
+                    "doesn't either. One strike is a lesson, not a verdict. "
+                    "Jack back in."
                 ),
             ),
         ],

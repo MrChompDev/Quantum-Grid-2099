@@ -141,8 +141,15 @@ async def main() -> int:
             print("connected; starting full campaign...", flush=True)
 
             for i, defn in enumerate(LEVELS):
-                c.send("\r")  # node select -> level intro
-                await c.read_until("PRESS ANY KEY TO ENGAGE")
+                c.send("\r")  # node select -> (one-time meet scene?) -> intro
+                while True:
+                    # a first-encounter daemon scene may interrupt before the
+                    # intro; the intro's ENGAGE line ends the wait
+                    delta = await c.read_until("PRESS ANY KEY TO ENGAGE", "SIGNAL LOG")
+                    if "SIGNAL LOG" in delta and "PRESS ANY KEY" not in delta:
+                        c.send("x")  # skip the first-encounter daemon scene
+                        continue
+                    break
                 c.send(" ")
                 await c.read_until("STATUS:")
                 keys = solve_keys(defn)

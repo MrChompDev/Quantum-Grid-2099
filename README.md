@@ -3,8 +3,10 @@
 A cyberpunk laser-reflection puzzle game played entirely over SSH — now with
 live ICE daemons (six kinds, including wall-phasing wraiths, lane-charging
 lancers and pulsing volt wards), splitter prisms, teleport arrays, datashards,
-persistent saves, a 19-entry codex, typewriter cutscenes, two endings, a
-settings system, an 8-bit chiptune engine and a pixel-doubled playfield. Every one of the 48 nodes is
+persistent saves, a 22-entry codex, typewriter cutscenes (prologue, sector
+beats, first-encounter daemons, two endings), career records, a daily
+gauntlet, an EMP burst, hint traces, a hall of fame, a settings
+system, an 8-bit chiptune engine and a pixel-doubled playfield. Every one of the 48 nodes is
 BFS-verified solvable AND beatable with live ICE by an adaptive bot
 (`scripts/audit_levels.py`).
 
@@ -91,6 +93,7 @@ par (optimal action count) after extraction.
 | `O` | Settings screen (from sector / node select) |
 | `C` | Open the codex (from sector / node select) |
 | `L` | Open the hall of fame (from sector / node select) |
+| `R` | Open the RECORDS screen (from the save menu) |
 | `D` | THE DAILY GAUNTLET (from sector select) |
 | `1`–`6` | Pick a sector |
 | `1`–`8` | Pick a node within a sector |
@@ -126,6 +129,8 @@ double-beeps).
 ### Story & cutscenes
 
 The campaign opens with a **prologue cutscene** (rain-soaked Sector 7, the debt, MIRAGE's call), each sector ends with a **dialogue cutscene** advancing the plot - NYX, MIRAGE, DIRECTOR VEX and ORACLE-9 trade words as you descend - and the finale plays one of **two ending cutscenes** before the victory screen. Pages type out character by character; any key reveals the page, ENTER advances, X skips the scene.
+
+On top of those, **eight one-time milestone cutscenes** play the first time their moment happens: meeting each daemon class for the first time (sentinel, hunter, wraith, lancer, corruptor, volt - each with its dossier beat), your first ICE strike, your first EMP burst, and your first death. Seen scenes are remembered in your save and never replay; several unlock codex entries. Press `R` on the save menu to see your **RECORDS** screen: 10 career achievements (first descent, clean room, EMP jockey, gauntlet runner, the true ending...) inscribed as you earn them.
 
 ### Settings
 
@@ -287,9 +292,9 @@ The title screen shows how many runners are currently jacked in.
 
 ### Codex
 
-Press `C` on the sector or node screen. 19 entries decrypt as you
-progress: faction lore, daemon dossiers (all six ICE kinds), and the
-truth about ORACLE-9.
+Press `C` on the sector or node screen. 22 entries decrypt as you
+progress: faction lore, dossiers for all six ICE kinds, the EMP array,
+the Wire, the Daily Gauntlet - and the truth about ORACLE-9.
 
 ## Architecture
 

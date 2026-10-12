@@ -59,6 +59,7 @@ class Game:
         self.actions = 0
         self.strikes = 0
         self.last_killer: str | None = None  # kind of the last striking daemon
+        self.last_emp_hits = 0  # daemons stunned by the last EMP burst
         self.emp_charges = EMP_CHARGES
         self.shards_taken: set[tuple[int, int]] = set()
         self.shards_banked: set[tuple[int, int]] = set()  # carried from prior runs
@@ -259,6 +260,7 @@ class Game:
                 en["stun"] = max(en.get("stun", 0), ice.DAEMON_STUN_TICKS)
                 self.flash[(ex, ey)] = 4
                 hit += 1
+        self.last_emp_hits = hit
         self.event = "emp"
         self.msg = (
             f"EMP BURST! {hit} daemon{'s' if hit != 1 else ''} stunned - move!"

@@ -508,14 +508,18 @@ def render_save_menu(
                     width,
                 ),
                 _center(
-                    _c(GRAY, "deaths on record:")
-                    + " "
+                    _c(GRAY, "records: ")
+                    + _c(WHITE, str(len(save.get("records", []))))
+                    + " [R]"
+                    + _c(GRAY, "  |  deaths on record: ")
                     + (_c(RED, str(deaths)) if deaths else _c(BEAM_GREEN, "0")),
                     width,
                 ),
                 "",
                 _center(_c(BEAM_GREEN, "[ENTER] CONTINUE RUN"), width),
-                _center(_c(WHITE, "[N] NEW RUN (resets progress)"), width),
+                _center(
+                    _c(WHITE, "[R] RECORDS   [N] NEW RUN (resets progress)"), width
+                ),
                 "",
                 _center(
                     _c(GRAY, "Shards banked survive a new run? No. The Grid"), width
@@ -688,6 +692,55 @@ def render_codex(
         [
             "",
             "  W/S: select | ENTER: read | C/Q: back",
+        ]
+    )
+    return _screen(body, width, height)
+
+
+def render_records(
+    save: dict,
+    width: int = MIN_W,
+    height: int = MIN_H,
+) -> str:
+    """The RECORDS screen: career achievements, earned or encrypted."""
+    from .lore import RECORDS
+
+    earned = set(save.get("records", []))
+    body = [
+        _center(
+            _c(CYAN, "RECORDS")
+            + _c(GRAY, " // ")
+            + _c(WHITE, f"{len(earned)}/{len(RECORDS)} INSCRIPTIONS"),
+            width,
+        ),
+        _center(_c(GRAY, "the wire keeps count - run well and it keeps yours"), width),
+        "",
+    ]
+    half = (len(RECORDS) + 1) // 2
+    for r in range(half):
+        cols = []
+        for idx in (r, r + half):
+            if idx >= len(RECORDS):
+                cols.append("")
+                continue
+            key, title, _ = RECORDS[idx]
+            mark = _c(BEAM_GREEN, "\u2713") if key in earned else _c(GRAY, "\u00b7")
+            if key in earned:
+                cols.append(f"{mark} {_c(WHITE, title)}")
+            else:
+                cols.append(f"{mark} {_c(GRAY, '?' * len(title))}")
+        pad = 38 - len(_strip_ansi(cols[0]))
+        body.append("  " + cols[0] + " " * max(1, pad) + cols[1])
+    shown = [rec for rec in RECORDS if rec[0] in earned]
+    if shown:
+        body.append("")
+        key, title, text = shown[-1]
+        body.append(_center(_c(YELLOW, f"// {title}"), width))
+        body.extend(_wrap_center(text, width, color=GRAY))
+    body.extend(
+        [
+            "",
+            "  R/Q: back",
         ]
     )
     return _screen(body, width, height)
