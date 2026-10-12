@@ -14,7 +14,8 @@ import os
 
 import asyncssh
 
-from . import audio, daily as daily_mod, leaderboard
+from . import audio, leaderboard
+from . import daily as daily_mod
 from . import enemies as ice
 from . import save as save_mod
 from .game import BANDWIDTH_MAX, DIR_VECTORS, Game, start_bandwidth
@@ -40,8 +41,8 @@ from .render import (
     ZONE_COUNT,
     ZONE_SIZE,
     render_codex,
-    render_daily_complete,
     render_cutscene,
+    render_daily_complete,
     render_frame,
     render_game_over,
     render_goodbye,
@@ -515,6 +516,191 @@ class Session:
             if key is QUIT or key in ("q", "l", "c"):
                 return
 
+    async def _play_daily(self) -> str | None:
+        """THE DAILY GAUNTLET: one shared node per day, its own board.
+
+        Attempts/best persist in the runner's save; the campaign
+        bandwidth carry is restored afterward so gauntlets never pollute
+        the descent. Returns QUIT on disconnect, else None.
+        """
+        from .render import render_frame as _rf  # local alias: keep flow readable
+
+        data = daily_mod.daily_level()
+        key = data.pop("date")
+        defn = LevelDef(
+            name=data["name"],
+            intro=data["intro"],
+            lore=data["lore"],
+            rows=tuple(data["rows"]),
+            zone=data["zone"],
+            par=data["par"],
+            bandwidth_start=data.get("bandwidth_start", BANDWIDTH_MAX),
+            bandwidth_floor=data.get("bandwidth_floor", 0),
+        )
+        daily = self.save.setdefault("daily", {})
+        rec = daily.setdefault(key, {"attempts": 0, "best": 0, "won": False})
+        rec["attempts"] += 1
+        save_mod.store(self.username, self.save)
+
+        carry = self.bandwidth
+        self.bandwidth = BANDWIDTH_MAX
+        game = Game(-1, BANDWIDTH_MAX, defn=defn, no_ice=self.no_ice)
+        self.width, self.height = self._frame_size()
+        self.write(
+            CLEAR + render_level_intro(defn, -1, BANDWIDTH_MAX, self.width, self.height)
+        )
+        if await self.read_key() is QUIT:
+            self.bandwidth = carry
+            return QUIT
+        self.player.sfx("engage")
+        self.player.set_song("explore")
+        self._fx_game = game
+        self.write(
+            _rf(
+                game,
+                self.width,
+                self.height,
+                0,
+                self.frame_no,
+                self.player.music_on,
+                self._vfx(),
+            )
+        )
+        try:
+            while True:
+                key_press = await self.read_key()
+                if key_press is QUIT:
+                    return QUIT
+                if key_press == "m":
+                    self.toggle_sound()
+                    self.write(
+                        _rf(
+                            game,
+                            self.width,
+                            self.height,
+                            0,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
+                if key_press == "k":
+                    game.restart()
+                    self.write(
+                        _rf(
+                            game,
+                            self.width,
+                            self.height,
+                            0,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
+                if key_press == "e":
+                    if game.do_emp():
+                        self.play_event(game.event)
+                        game.event = None
+                    self.write(
+                        _rf(
+                            game,
+                            self.width,
+                            self.height,
+                            0,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
+                if key_press == "h":
+                    if game.do_hint():
+                        self.play_event(game.event)
+                        game.event = None
+                    self.write(
+                        _rf(
+                            game,
+                            self.width,
+                            self.height,
+                            0,
+                            self.frame_no,
+                            self.player.music_on,
+                            self._vfx(),
+                        )
+                    )
+                    continue
+                if key_press in DIR_VECTORS:
+                    acted = game.do_move(*DIR_VECTORS[key_press]) == "ok"
+                elif key_press == "r":
+                    acted = game.do_rotate()
+                else:
+                    continue
+                if acted:
+                    self.play_event(game.event)
+                    game.event = None
+                if game.check_win():
+                    score = game.score()
+                    rec["best"] = max(rec.get("best", 0), score)
+                    rec["won"] = True
+                    banked = sum(len(v) for v in self.save.get("shards", {}).values())
+                    board = f"daily-{key}"
+                    leaderboard.record(
+                        self.username, rec["best"], 1, banked, name=board
+                    )
+                    rank = leaderboard.rank_of(
+                        self.username, rec["best"], 1, banked, name=board
+                    )
+                    save_mod.store(self.username, self.save)
+                    self._fx_game = None
+                    self.player.sfx("unlock")
+                    if (
+                        await self._show_animated(
+                            lambda f, r=rank: render_daily_complete(
+                                game,
+                                rec["best"],
+                                r,
+                                self.width,
+                                self.height,
+                                f,
+                            )
+                        )
+                        is QUIT
+                    ):
+                        return QUIT
+                    return None
+                if game.game_over:
+                    self._fx_game = None
+                    self.player.set_song(None)
+                    self.player.sfx("gameover")
+                    self.session_deaths += 1
+                    self.save["deaths"] = self.save.get("deaths", 0) + 1
+                    save_mod.store(self.username, self.save)
+                    if (
+                        await self._show_animated(
+                            lambda f: render_game_over(game, self.width, self.height, f)
+                        )
+                        is QUIT
+                    ):
+                        return QUIT
+                    return None
+                self.width, self.height = self._frame_size()
+                self.write(
+                    _rf(
+                        game,
+                        self.width,
+                        self.height,
+                        0,
+                        self.frame_no,
+                        self.player.music_on,
+                        self._vfx(),
+                    )
+                )
+        finally:
+            self._fx_game = None
+            self.bandwidth = carry  # gauntlets never touch the campaign carry
+
     def _vfx(self) -> dict:
         return {
             "shake": self.settings.get("shake", "on") == "on",
@@ -544,6 +730,11 @@ class Session:
                 continue
             if key == "l":
                 await self._leaderboard_screen()
+                continue
+            if key == "d":
+                self.player.sfx("menu")
+                if await self._play_daily() is QUIT:
+                    return "quit"
                 continue
             if key == "o":
                 self.player.sfx("menu")

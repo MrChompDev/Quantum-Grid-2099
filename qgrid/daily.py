@@ -34,8 +34,10 @@ DAILY_LORE = (
 
 
 def day_key(date: _dt.date | None = None) -> str:
-    """YYYYMMDD string for a gauntlet day."""
-    return (date or _dt.date.today()).strftime("%Y%m%d")
+    """YYYYMMDD string for a gauntlet day (server-local midnight)."""
+    if date is None:
+        date = _dt.datetime.now().astimezone().date()
+    return date.strftime("%Y%m%d")
 
 
 def cache_path(key: str) -> str:
@@ -54,7 +56,7 @@ def daily_level(date: _dt.date | None = None) -> dict:
     if cached is not None:
         cached["rows"] = tuple(cached["rows"])  # JSON round-trips lists
         return cached
-    when = date or _dt.date.today()
+    when = date if date is not None else _dt.datetime.now().astimezone().date()
     index = WEEKLY[when.weekday()]
     data = generate_level(index, Random(f"qg-daily-{key}"))
     data["name"] = f"GAUNTLET {when.strftime('%b %d').upper()}"

@@ -40,7 +40,7 @@ def _store(entries: list[dict], name: str = "main") -> None:
         tmp = f"{path(name)}.tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(entries[:MAX_ENTRIES], fh, sort_keys=True)
-        os.replace(tmp, path())
+        os.replace(tmp, path(name))
     except OSError:
         pass  # the board is best-effort; never crash a session over it
 

@@ -482,5 +482,3 @@ def generate_level(index: int, rng: Random) -> dict:
             "bandwidth_floor": 0,
         }
     raise RuntimeError(f"could not generate level {index} after {attempts} attempts")
-
-

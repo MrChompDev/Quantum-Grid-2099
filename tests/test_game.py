@@ -641,3 +641,84 @@ class TestFlawless:
         game.do_move(1, 0)  # step next to the hunter; it strikes
         assert game.strikes == 1
         assert game.last_killer == "hunter"
+
+
+class TestHint:
+    def test_hint_costs_and_flashes_without_ticking(self):
+        defn = LevelDef(
+            name="hint",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#..*.........#",
+                    "#..H.........#",
+                    "#....@...E...#",
+                    "#............#",
+                    "#>./.........#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        bw = game.bandwidth
+        daemon_pos = dict(game.daemons[0])["pos"]
+        assert game.do_hint() is True
+        assert game.bandwidth == bw - 5
+        assert game.actions == 0  # a trace is not an action
+        assert game.flash, "hint left no destination glint"
+        assert game.daemons[0]["pos"] == daemon_pos  # world did not tick
+        assert "TRACE" in game.msg
+
+    def test_hint_refused_when_low(self):
+        defn = LevelDef(
+            name="hint2",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#....@...E...#",
+                    "#............#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 5, defn=defn, rng_seed=1)
+        assert game.do_hint() is False
+        assert game.bandwidth == 5  # nothing charged
+
+    def test_hint_on_unsolvable_state(self):
+        # A state the solver cannot escape: player walled in by emitters
+        # on all sides is impossible to build - instead verify the refusal
+        # path via a mock.
+        defn = LevelDef(
+            name="hint3",
+            intro="t",
+            lore="l",
+            rows=mkmini(
+                [
+                    "#............#",
+                    "#....@...E...#",
+                    "#............#",
+                    "#............#",
+                    "#>..#.*......#",
+                    "#............#",
+                    "#............#",
+                ]
+            ),
+            par=5,
+        )
+        game = Game(0, 100, defn=defn, rng_seed=1)
+        from unittest.mock import patch
+
+        with patch("qgrid.game.solve_state", return_value=None):
+            assert game.do_hint() is False
+        assert "No solution thread" in game.msg
+        assert game.bandwidth == 100  # refusal is free

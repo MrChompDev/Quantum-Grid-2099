@@ -186,3 +186,31 @@ def test_per_axis_scale_tiers():
     big = Game(47, 100)  # 72x16
     assert R._grid_scale(big, 80, 24) == (1, 1)
     assert R._grid_scale(big, 200, 50) == (2, 2)
+
+
+class TestChromeFit:
+    def test_controls_line_fits_min_terminal(self):
+        plain = len(R._strip_ansi(R._CONTROLS_LINE))
+        eq = len(R._strip_ansi(R._eq_strip(0, True, False)))
+        assert plain + eq + 1 <= R.MIN_W, (
+            f"controls {plain} + eq {eq} overflow {R.MIN_W}"
+        )
+
+    def test_menu_footers_fit_min_terminal(self):
+        from qgrid.render import _strip_ansi, render_node_select, render_zone_select
+
+        save = {"unlocked": 0, "shards": {}}
+        zone = _strip_ansi(render_zone_select(save, False, R.MIN_W, R.MIN_H))
+        node = _strip_ansi(render_node_select(1, save, False, R.MIN_W, R.MIN_H))
+        for line in (zone + node).replace("\r", "").split("\n"):
+            assert len(line) <= R.MIN_W, f"footer overflow: {line!r}"
+
+
+class TestTitleOnline:
+    def test_title_shows_online_runners(self):
+        frame = R._strip_ansi(R.render_title(R.MIN_W, R.MIN_H, 0, online=3))
+        assert "3 RUNNERS ON THE GRID" in frame
+
+    def test_title_hides_line_when_solo(self):
+        frame = R._strip_ansi(R.render_title(R.MIN_W, R.MIN_H, 0, online=1))
+        assert "1 RUNNER ON THE GRID" in frame

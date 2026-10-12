@@ -85,11 +85,13 @@ par (optimal action count) after extraction.
 | `W A S D` / arrow keys | Move the light-beam probe |
 | `R` | Rotate an adjacent (or underfoot) mirror |
 | `E` | Fire the EMP burst (1 charge per node, 10% bandwidth) |
+| `H` | Buy a hint: traces the next optimal step (5% bandwidth) |
 | `K` | Restart the current node (restores entry bandwidth) |
 | `M` | Cycle sound mode: full → music → SFX → off |
 | `O` | Settings screen (from sector / node select) |
 | `C` | Open the codex (from sector / node select) |
 | `L` | Open the hall of fame (from sector / node select) |
+| `D` | THE DAILY GAUNTLET (from sector select) |
 | `1`–`6` | Pick a sector |
 | `1`–`8` | Pick a node within a sector |
 | `ENTER` | Continue: next uncleared node |
@@ -217,6 +219,27 @@ mid-dash, a volt mid-pulse. It costs 10% bandwidth. The HUD shows
 `EMP READY` / `EMP SPENT`. Save it for the corridor you can't route
 around — a stunned daemon is also a door.
 
+### The hint trace
+
+Stuck? `H` runs a solver trace from your current position: it flashes
+the next optimal step (a destination cell, or the mirror that wants a
+turn) and tells you the direction. A trace costs **5% bandwidth** and
+does **not** advance the world — daemons hold still while you peek. No
+affordable trace when you're below 6%; no refund if the tangle you're in
+has no solution thread (it says so, and suggests `K`).
+
+### THE DAILY GAUNTLET
+
+Press `D` on the sector screen: **one shared node per calendar day**,
+seeded from the date so every runner on the server faces the exact same
+floor. Difficulty ramps through the week — Monday is a sector-3 warm-up,
+Sunday is a six-daemon sector-6 finale. Scores post to a per-day hall of
+fame (separate from the campaign board) with your daily best and rank;
+attempts persist in your save. Gauntlets never touch your campaign
+bandwidth carry, and the board resets at midnight. The day's layout is
+generated once and cached under the save directory, so the whole server
+shares it instantly.
+
 ### ICE combat
 
 Daemons act on every successful player action (turn-based):
@@ -256,8 +279,11 @@ shard count to the server-wide leaderboard — press `L` on the sector or
 node screen to see the standings, your row highlighted, your rank shown
 even when you're outside the top 10. The victory screen prints your
 final hall-of-fame rank and the session death count (a flawless descent
-is called out). One JSON file under the save directory; corrupt files
-degrade to an empty board, never a crashed session.
+is called out). THE DAILY GAUNTLET keeps its own per-day board. One
+JSON file per board under the save directory; corrupt files degrade to
+an empty board, never a crashed session.
+
+The title screen shows how many runners are currently jacked in.
 
 ### Codex
 
@@ -285,11 +311,13 @@ qgrid/
   bot.py           adaptive live-ICE playthrough bot (danger-aware re-planning agent)
   render.py        adaptive full-terminal ANSI frames, 2x2 upscaling, VFX
   save.py          per-username JSON persistence
-  leaderboard.py   server-wide hall of fame (best career scores)
+  leaderboard.py   server-wide hall of fame (campaign + per-day boards)
+  daily.py         THE DAILY GAUNTLET (date-seeded shared node, cached)
+  generator.py     constructive level generator core (BFS-verified)
   server.py        asyncssh server, session state machine, raw input handling
 tests/             unit + solver + live-ICE bot + campaign verification tests
 scripts/
-  generate_levels.py   procedural generator (constructive + BFS-verified)
+  generate_levels.py   procedural generator CLI (constructive + BFS-verified)
   smoke_test.py        end-to-end: boots the server, plays Node 01 over SSH
   full_playthrough.py  beats all 48 nodes over SSH via BFS-optimal solutions
 ```

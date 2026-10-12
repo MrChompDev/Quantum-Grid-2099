@@ -472,11 +472,15 @@ def render_title(
         _center(_c(GRAY, assets.LEGEND_ROW), width),
         _center(_c(GRAY, assets.LEGEND_LABELS), width),
         "",
-        _center(
-            "Rotate mirrors, split beams, fold space, dodge the daemons.", width
-        ),
+        _center("Rotate mirrors, split beams, fold space, dodge the daemons.", width),
         _center(_c(GRAY, "\u266a no sound? run: python3 -m qgrid.audio_client"), width),
-        _center(_c(BEAM_GREEN, f"\u25c9 {online} RUNNER{'S' if online != 1 else ''} ON THE GRID"), width)
+        _center(
+            _c(
+                BEAM_GREEN,
+                f"\u25c9 {online} RUNNER{'S' if online != 1 else ''} ON THE GRID",
+            ),
+            width,
+        )
         if online
         else "",
         _center(_blink(">>> PRESS ANY KEY TO JACK IN <<<", frame, BEAM_GREEN), width),

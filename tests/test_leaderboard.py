@@ -78,3 +78,13 @@ class TestScreen:
 
         frame = _strip_ansi(render_leaderboard({}, "nyx", 90, 30))
         assert "board is empty" in frame.lower()
+
+
+class TestNamedBoards:
+    def test_daily_board_is_isolated(self):
+        leaderboard.record("nyx", 100, 1, 0, name="daily-20261012")
+        leaderboard.record("nyx", 99999, 48, 20)  # main board
+        assert leaderboard.board("daily-20261012")[0]["score"] == 100
+        assert leaderboard.board("main") == leaderboard.board()
+        assert leaderboard.board()[0]["score"] == 99999
+        assert leaderboard.rank_of("nyx", 100, 1, 0, name="daily-20261012") == 1
