@@ -1,0 +1,23 @@
+# Quantum Grid 2099 — one-command hosting:
+#   docker compose up -d --build
+#   ssh -p 2222 <this-host>
+services:
+  qgrid:
+    build: .
+    image: quantum-grid-2099
+    container_name: quantum-grid-2099
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    environment:
+      # Optional server knobs (see README "Environment"); defaults shown.
+      QG_AUDIO: ${QG_AUDIO:-full}          # full / music / sfx / off
+      QG_BELL: ${QG_BELL:-on}              # on / off (off when using the companion client)
+      QG_UNLOCK_ALL: ${QG_UNLOCK_ALL:-0}   # 1 = unlock all 48 nodes (demo mode)
+      QG_NO_ICE: ${QG_NO_ICE:-0}           # 1 = disable ICE daemons
+    volumes:
+      # Player saves + SSH host key persist across restarts and rebuilds.
+      - qgrid-data:/data
+
+volumes:
+  qgrid-data:

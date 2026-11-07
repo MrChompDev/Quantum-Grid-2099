@@ -1,0 +1,16 @@
+# Keep the image minimal: runtime code only.
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+__pycache__
+**/__pycache__
+*.py[cod]
+saves/
+ssh_host_key
+tests/
+scripts/
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md

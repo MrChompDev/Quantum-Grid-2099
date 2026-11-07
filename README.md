@@ -36,7 +36,62 @@ datashards he left behind.
 ================================================================================
 ```
 
-## Quick Start
+## Play over SSH (how to connect)
+
+Quantum Grid 2099 is not a website and not a download — **it is an SSH
+server**. You jack in with any SSH client, exactly like logging into a
+remote machine:
+
+```bash
+ssh -p 2222 <server-address>
+```
+
+- **`<server-address>`** — `localhost` if you run the server yourself
+  (see [Quick Start](#quick-start-run-your-own-server) below), or the
+  IP / hostname of a hosted instance, e.g.
+  `ssh -p 2222 grid.example.com` or `ssh -p 2222 203.0.113.7`.
+- **No password, no SSH keys.** Anyone who connects gets a session, and
+  your SSH username **is your save file** — log in as the same user to
+  resume where you left off (`ssh -p 2222 runner@grid.example.com`).
+- **First connection:** you'll see the standard host-key prompt
+  (`The authenticity of host '...' can't be established`). Type `yes` —
+  the server generates its own Ed25519 host key on first boot.
+
+### Connecting from…
+
+**Linux / macOS** — `ssh` is preinstalled. Open a terminal:
+
+```bash
+ssh -p 2222 <server-address>          # anonymous quick session
+ssh -p 2222 nyx@<server-address>      # resume the "nyx" save
+```
+
+**Windows 10 / 11** — the OpenSSH client is built in. From PowerShell
+or Command Prompt:
+
+```powershell
+ssh -p 2222 <server-address>
+```
+
+(If `ssh` isn't found: *Settings → Apps → Optional features → Add
+"OpenSSH Client"*.)
+
+**Windows with PuTTY** — Host Name: `<server-address>`, Port: `2222`,
+Connection type: `SSH`, then *Open*. The name you enter at the
+`login as:` prompt is your save name.
+
+**Best experience (any OS)** — use the companion audio client instead of
+bare `ssh` and the chiptune plays through your actual speakers (see
+[Hearing the soundtrack](#hearing-the-soundtrack-companion-client)):
+
+```bash
+python3 -m qgrid.audio_client -- ssh -p 2222 <server-address>
+```
+
+That's it — any terminal 80×24 or larger, one keystroke at a time.
+Press `Q` in-game to disconnect.
+
+## Quick Start (run your own server)
 
 ```bash
 pip install -r requirements.txt
@@ -65,6 +120,7 @@ your SSH username **is your save file**. Log in as the same user to resume.
 | `QG_NO_ICE=1` | Disable ICE daemons (laser-puzzle verification runs) |
 | `QG_SAVE_DIR=...` | Save directory (default: `./saves`) |
 | `QG_AUDIO=off` | Initial sound mode: `full` / `music` / `sfx` / `off` |
+| `QG_BELL=off` | Mute the terminal-bell fallback (use with the companion client to avoid double-beeps) |
 
 ## The Campaign
 
@@ -300,6 +356,8 @@ the Wire, the Daily Gauntlet - and the truth about ORACLE-9.
 
 ```
 main.py            entry point (asyncio + signal handling)
+Dockerfile         container image for one-command hosting
+docker-compose.yml `docker compose up -d` deployment (saves + host key on a volume)
 qgrid/
   assets.py        unicode glyph theme, block-letter banner font, art motifs
   lore.py          sectors, node beats, codex, endings, MIRAGE transmissions
@@ -354,7 +412,33 @@ python scripts/full_playthrough.py  # full 48-node campaign over real SSH
 python scripts/generate_levels.py   # regenerate level data (seed 2099)
 ```
 
-## Deployment (VPS)
+## Deployment (host it on a server)
+
+### Docker (easiest)
+
+On any host with Docker (VPS, home server, cloud instance):
+
+```bash
+docker compose up -d --build
+# players connect with: ssh -p 2222 <your-server-ip>
+```
+
+Player saves and the SSH host key live on the `qgrid-data` volume and
+survive rebuilds and restarts. To serve on a different external port,
+change the published port (e.g. `"2200:2222"`) and connect with
+`ssh -p 2200 <your-server-ip>`. Configuration knobs (see
+[Environment](#environment)) can be passed through `.env` or the
+compose `environment:` block.
+
+Prefer plain docker, no compose:
+
+```bash
+docker build -t quantum-grid-2099 .
+docker run -d --name quantum-grid-2099 -p 2222:2222 \
+  -v qgrid-data:/data quantum-grid-2099
+```
+
+### Bare metal / VPS
 
 ```bash
 pip install -r requirements.txt
@@ -380,9 +464,13 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl enable --now qgrid
+# open the game port in your firewall (and cloud security group, if any)
+sudo ufw allow 2222/tcp
 ```
 
-Players then connect with `ssh -p 2222 <your-vps-ip>` — any username works,
-and each username keeps its own save.
+Players then connect with `ssh -p 2222 <your-server-ip>` — see
+[Play over SSH](#play-over-ssh-how-to-connect) at the top for
+platform-by-platform connection instructions. Any username works, and
+each username keeps its own save.
 
 *The Grid keeps count even when you can't. Jack back in.*
