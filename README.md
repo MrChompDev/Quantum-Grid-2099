@@ -479,6 +479,16 @@ sudo systemctl enable --now qgrid
 sudo ufw allow 2222/tcp
 ```
 
+> **Oracle Linux / RHEL-family images** (including Oracle Cloud platform
+> images) ship **firewalld** instead of ufw — and their default zone rejects
+> every port except SSH, *in addition to* the cloud security list:
+>
+> ```bash
+> sudo firewall-cmd --permanent --add-port=2222/tcp && sudo firewall-cmd --reload
+> ```
+>
+> If players get "No route to host" instead of a timeout, this is why.
+
 Players then connect with `ssh -p 2222 <your-server-ip>` — see
 [Play over SSH](#play-over-ssh-how-to-connect) at the top for
 platform-by-platform connection instructions. Any username works, and
