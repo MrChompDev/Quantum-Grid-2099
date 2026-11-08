@@ -1,0 +1,20 @@
+# systemd unit for the live deployment — Oracle Linux 9 micro VM.
+#   sudo cp scripts/qgrid.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now qgrid
+#
+# Game auto-starts on boot and restarts if it ever crashes.
+# Host key: /opt/qgrid/ssh_host_key   Saves: /opt/qgrid/saves/
+[Unit]
+Description=Quantum Grid 2099 SSH game server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/qgrid
+ExecStart=/opt/py/python/bin/python3.12 main.py --host 0.0.0.0 --port 2222
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=3
+User=opc
+
+[Install]
+WantedBy=multi-user.target

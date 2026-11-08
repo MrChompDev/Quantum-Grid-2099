@@ -38,6 +38,16 @@ datashards he left behind.
 
 ## Play over SSH (how to connect)
 
+**A live community server is up right now:**
+
+```bash
+ssh -p 2222 152.67.106.24
+```
+
+*(Oracle Cloud Always-Free micro instance, Sydney — runs 24/7. Any username
+works; it becomes your save file. If it's ever asleep at the switch, spin up
+your own with the [Deployment](#deployment-host-it-on-a-server) section below.)*
+
 Quantum Grid 2099 is not a website and not a download — **it is an SSH
 server**. You jack in with any SSH client, exactly like logging into a
 remote machine:
@@ -445,7 +455,8 @@ pip install -r requirements.txt
 python main.py --host 0.0.0.0 --port 2222
 ```
 
-systemd unit (`/etc/systemd/system/qgrid.service`):
+systemd unit (`/etc/systemd/system/qgrid.service`) — a ready-made unit as
+deployed on the live server is in [`scripts/qgrid.service`](scripts/qgrid.service):
 
 ```ini
 [Unit]
